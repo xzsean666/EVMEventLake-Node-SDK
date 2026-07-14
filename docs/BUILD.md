@@ -2,35 +2,29 @@
 
 Version: 1.0
 
-Status: Pre-implementation contract
+Status: Implementation underway
 
 ## 1. Current Repository State
 
-The repository currently contains architecture and product documentation only.
-Implementation Step 4 has not been approved.
-
-Therefore, the commands and examples in this document define the intended build,
-installation, and usage contract. They are not expected to run until the
-corresponding implementation phase is complete.
-
-Do not create package files or source code merely to make these commands pass
-without explicit user approval to begin Step 4.
+Step 4 was approved on 2026-07-14. The ESM package foundation, strict
+TypeScript configuration, public errors, observability contracts, configuration
+validation, lockfile, and initial unit tests are implemented. Later SDK modules
+described below remain in progress until their phases are completed.
 
 ## 2. Planned Toolchain
 
 | Tool | Planned requirement | Purpose |
 | --- | --- | --- |
-| Node.js | 22 or newer supported LTS | Runtime |
-| TypeScript | Current supported stable major selected in Step 4 | Source and declarations |
-| pnpm | Current stable major, pinned in `packageManager` | Development and consumer examples |
-| viem | Version pinned in lockfile | HTTP EVM RPC and ABI primitives |
-| Kysely | Version pinned in lockfile | Typed SQL construction and dialect boundary |
-| better-sqlite3 | Version pinned in lockfile | SQLite adapter |
-| pg | Version pinned in lockfile | PostgreSQL adapter |
-| Vitest | Version pinned in lockfile | Unit and integration tests |
+| Node.js | 22 or newer; development verified with 24.2.0 | Runtime |
+| TypeScript | 5.9.3 | Source and declarations |
+| pnpm | 10.12.1 | Development and consumer examples |
+| viem | 2.55.2 | HTTP EVM RPC and ABI primitives |
+| Kysely | 0.29.3 | Typed SQL construction and dialect boundary |
+| better-sqlite3 | 12.11.1 | SQLite adapter |
+| pg | 8.22.0 | PostgreSQL adapter |
+| Vitest | 4.1.10 | Unit and integration tests |
 
-Exact dependency versions must be selected and recorded during Step 4 after
-checking the current official documentation in `EXTERNAL_DOCS.md`.
+The exact versions are pinned in `package.json` and `pnpm-lock.yaml`.
 
 ## 3. Package and Distribution Model
 
@@ -38,13 +32,13 @@ checking the current official documentation in `EXTERNAL_DOCS.md`.
 
 The SDK is not published to the npm registry.
 
-The implementation package manifest must:
+The package manifest:
 
-- Use a stable package name, planned as `@evm-event-lake/node-sdk`.
-- Mark registry publication as disabled.
-- Declare explicit runtime and type exports.
-- Build from a clean Git clone during Git dependency installation.
-- State the supported Node.js version.
+- Uses the stable package name `@evm-event-lake/node-sdk`.
+- Marks registry publication as disabled with `private: true`.
+- Declares ESM runtime and type exports.
+- Uses the standard `prepare` lifecycle for Git dependency installation.
+- Requires Node.js 22 or newer.
 
 No npm token or registry publish workflow is required.
 

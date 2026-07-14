@@ -2,7 +2,7 @@
 
 Version: 1.0
 
-Status: Architecture baseline; implementation not approved
+Status: Architecture baseline; implementation underway
 
 Runtime: Node.js with TypeScript
 
@@ -807,8 +807,9 @@ string passed into scattered conditional logic.
 
 ### 12.7 Explicit async initialization
 
-Schema setup and RPC validation must be visible and awaitable. Lazy side effects
-inside the first query or update would make failures unpredictable.
+Schema setup and target registration are visible and awaitable during `create`.
+RPC validation occurs only inside an explicit RPC operation such as `update`,
+so database-only queries remain usable during provider outages.
 
 ### 12.8 Bounded reliability behavior
 
@@ -848,8 +849,7 @@ Official documentation links and their verification dates are maintained in
 
 ## 14. Incremental Implementation Plan
 
-Implementation is not approved by this architecture document. When the user
-explicitly authorizes Step 4, build in this order:
+Step 4 was approved on 2026-07-14. Continue implementation in this order:
 
 1. Package skeleton, public types, configuration validation, and typed errors.
 2. Contract target identity and ABI event catalog.

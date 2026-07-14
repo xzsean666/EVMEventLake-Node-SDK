@@ -51,8 +51,9 @@ Before starting any step, the agent must:
 | 3 | Context Handoff | `docs/nextsession.md` | No |
 | 4 | Implementation | Source code, package configuration, migrations, tests, examples | Only after explicit user approval |
 
-The repository is currently a documentation-only baseline. Step 4 must not
-begin until the user explicitly asks to implement the SDK.
+Step 4 was explicitly approved on 2026-07-14 and implementation is underway.
+Use `docs/nextsession.md` to identify the current implementation phase and do
+not skip unfinished earlier phases.
 
 ## 4. Product Definition
 
@@ -278,8 +279,8 @@ Do not continue building on a known architectural violation.
 
 ## 14. Step 4 Approval Gate
 
-Before creating `package.json`, TypeScript source, migrations, tests, examples,
-or CI workflows, receive explicit user approval to begin implementation.
+Explicit approval for Step 4 was received on 2026-07-14. Any future expansion
+beyond the documented SDK boundary still requires a new explicit user decision.
 
 When approved, follow the incremental order in
 `docs/ARCHITECTURE.md`. Complete and verify one phase before starting the next.

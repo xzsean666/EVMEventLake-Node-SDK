@@ -2,7 +2,7 @@
 
 Version: 1.0
 
-Status: Documentation baseline; implementation not approved
+Status: Implementation underway
 
 ## 1. Product Summary
 

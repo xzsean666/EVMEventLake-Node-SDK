@@ -70,11 +70,11 @@ specific provider.
 
 ## 4. Planned Runtime Libraries
 
-Exact versions are intentionally deferred until implementation Step 4. When a
-version is selected, add it beside the relevant project and record any
-version-specific documentation URL.
+Runtime versions are pinned in `package.json` and `pnpm-lock.yaml`.
 
 ### viem
+
+- Selected version: `2.55.2`.
 
 - Main docs: <https://viem.sh/docs/getting-started>
 - Read logs: <https://viem.sh/docs/actions/public/getLogs>
@@ -90,6 +90,8 @@ version-specific documentation URL.
 
 ### Kysely
 
+- Selected version: `0.29.3`.
+
 - Main docs: <https://kysely.dev/docs/intro>
 - Migrations: <https://kysely.dev/docs/migrations>
 - API docs: <https://kysely-org.github.io/kysely-apidoc/>
@@ -104,6 +106,8 @@ by this repository and tested against both databases.
 
 ### better-sqlite3
 
+- Selected version: `12.11.1`.
+
 - Repository: <https://github.com/WiseLibs/better-sqlite3>
 - API docs: <https://github.com/WiseLibs/better-sqlite3/blob/master/docs/api.md>
 - Relationship: Planned runtime dependency for SQLite installations.
@@ -113,6 +117,8 @@ by this repository and tested against both databases.
 - Verified: 2026-07-14.
 
 ### node-postgres (`pg`)
+
+- Selected version: `8.22.0`.
 
 - Main docs: <https://node-postgres.com/>
 - Features: <https://node-postgres.com/features/connecting>
@@ -151,6 +157,9 @@ by this repository and tested against both databases.
 
 ### Node.js
 
+- Supported runtime: Node.js 22 or newer.
+- Development verification: Node.js `24.2.0`.
+
 - Official docs: <https://nodejs.org/docs/latest/api/>
 - Release/LTS status: <https://nodejs.org/en/about/previous-releases>
 - Relationship: Required runtime.
@@ -163,6 +172,8 @@ Step 4.
 
 ### TypeScript
 
+- Selected version: `5.9.3`.
+
 - Official docs: <https://www.typescriptlang.org/docs/>
 - Declaration publishing guidance:
   <https://www.typescriptlang.org/docs/handbook/declaration-files/publishing.html>
@@ -172,6 +183,8 @@ Step 4.
 - Verified: 2026-07-14.
 
 ### pnpm
+
+- Selected version: `10.12.1`.
 
 - Main docs: <https://pnpm.io/>
 - Add command and Git-hosted dependencies: <https://pnpm.io/cli/add>
@@ -198,6 +211,8 @@ Step 4.
 ## 7. Planned Test Tooling
 
 ### Vitest
+
+- Selected version: `4.1.10`.
 
 - Official guide: <https://vitest.dev/guide/>
 - API reference: <https://vitest.dev/api/>

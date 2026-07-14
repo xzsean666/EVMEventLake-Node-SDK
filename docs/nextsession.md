@@ -4,18 +4,18 @@ Last updated: 2026-07-14
 
 ## 1. Current Status
 
-Steps 1 through 3 of the repository workflow are complete:
+Steps 1 through 3 of the repository workflow are complete and Step 4 is active:
 
 - Step 1: Architecture design completed and committed.
 - Step 2: Product, build, external documentation, and agent rules completed and
   committed.
 - Step 3: This context handoff completed.
-- Step 4: Not started and not approved.
+- Step 4: Approved on 2026-07-14; Phase 1 completed.
 
-The repository remains documentation-only. There is no package manifest,
-TypeScript source, migration, test, example, build output, or CI workflow.
-
-Do not begin implementation until the user explicitly approves Step 4.
+The repository now contains an ESM package foundation, pinned dependencies,
+strict TypeScript and ESLint configuration, public errors, observability
+contracts, configuration validation, and initial unit tests. Storage, RPC,
+synchronization, query, integration, and release phases remain pending.
 
 ## 2. Required Read Order
 
@@ -185,20 +185,16 @@ and synchronized documentation update.
     subject to current-version verification in Step 4.
 18. No generic `utils`, `common`, or service-locator module.
 
-## 7. Pending Tasks — Step 4 Only After Approval
+## 7. Step 4 Implementation Progress
 
 Follow this order. Each item must compile and pass focused tests before the next
 item begins.
 
-### Phase 1 — Package foundation
+### Phase 1 — Package foundation — completed
 
-1. Re-check current official versions and Node.js LTS support.
-2. Decide and document ESM-only versus dual ESM/CommonJS output.
-3. Create `package.json`, pnpm lockfile, TypeScript configs, formatting, linting,
-   test, build, and verify commands.
-4. Disable npm registry publication.
-5. Define the public export boundary and typed errors.
-6. Add configuration types, defaults, validation, and redaction tests.
+Completed with ESM-only output, Node.js 22+ support, pinned dependencies,
+registry publication disabled, public error/observability exports, normalized
+configuration, URL redaction, 8 unit tests, and a passing build.
 
 ### Phase 2 — Target and ABI
 
@@ -281,23 +277,14 @@ item begins.
 
 ## 8. Immediate Next Action
 
-Wait for explicit user approval to begin Step 4.
-
-When approval arrives, state:
-
-- Current step: Step 4 — Implementation.
-- First output: Package foundation only.
-- Verification: Focused foundation tests and build checks.
-
-Then start Phase 1 only. Do not scaffold every future module at once.
+Continue with Phase 2: contract target identity, ABI catalog, decoding outcomes,
+and lossless value codecs. Do not start storage until Phase 2 tests pass.
 
 ## 9. Risks and Unknowns
 
 ### 9.1 Package module format
 
-ESM-only versus dual ESM/CommonJS output is not decided. ESM-only is simpler;
-dual output may be easier for more Node.js consumers but increases build and
-export testing. Decide from expected consumers before source creation.
+Resolved: the package is ESM-only and requires Node.js 22 or newer.
 
 ### 9.2 Git install preparation lifecycle
 
@@ -314,8 +301,8 @@ before locking the release contract.
 
 ### 9.4 Exact dependency versions
 
-Libraries are selected conceptually but no versions are pinned. Re-check current
-official releases and compatibility at implementation time.
+Resolved for the initial implementation: versions are pinned in `package.json`
+and `pnpm-lock.yaml`; review them again before a release tag.
 
 ### 9.5 Confirmation defaults
 
