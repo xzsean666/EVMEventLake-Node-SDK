@@ -2,7 +2,7 @@
 
 Version: 1.0
 
-Status: Architecture baseline; implementation underway
+Status: Architecture implemented; release verification underway
 
 Runtime: Node.js with TypeScript
 

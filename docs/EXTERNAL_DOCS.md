@@ -187,8 +187,8 @@ by this repository and tested against both databases.
 - Why used: Runtime for the SDK and consumer applications.
 - Verified: 2026-07-14.
 
-Check the LTS table again before selecting the exact minimum Node.js version in
-Step 4.
+Check the LTS table again before changing the Node.js 22 minimum in a future
+release.
 
 ### TypeScript
 
@@ -197,7 +197,7 @@ Step 4.
 - Official docs: <https://www.typescriptlang.org/docs/>
 - Declaration publishing guidance:
   <https://www.typescriptlang.org/docs/handbook/declaration-files/publishing.html>
-- Relationship: Planned source/build dependency.
+- Relationship: Source/build development dependency.
 - SDK areas: Public types, source, declarations, build.
 - Why used: Stable typed API for Node.js consumers.
 - Verified: 2026-07-14.

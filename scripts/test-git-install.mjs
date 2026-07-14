@@ -40,7 +40,7 @@ async function main() {
   try {
     await writeConsumerProject(consumerDirectory, installSpec);
     await run("pnpm", ["install"], consumerDirectory);
-    await verifyInstalledCommit(consumerDirectory, commit, installSpec);
+    await verifyInstalledCommit(consumerDirectory, commit);
     await run("pnpm", ["run", "typecheck"], consumerDirectory);
     await run("pnpm", ["run", "smoke"], consumerDirectory);
     process.stdout.write(
@@ -102,16 +102,9 @@ async function writeConsumerProject(directory, dependencySpec) {
   ]);
 }
 
-async function verifyInstalledCommit(
-  directory,
-  expectedCommit,
-  dependencySpec,
-) {
+async function verifyInstalledCommit(directory, expectedCommit) {
   const lockfile = await readFile(join(directory, "pnpm-lock.yaml"), "utf8");
-  if (
-    dependencySpec.startsWith("git+file:") &&
-    !lockfile.includes(expectedCommit)
-  ) {
+  if (!lockfile.includes(expectedCommit)) {
     throw new Error(
       "Consumer lockfile does not contain the expected Git commit",
     );

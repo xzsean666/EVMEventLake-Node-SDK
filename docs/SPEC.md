@@ -83,7 +83,7 @@ https://github.com/xzsean666/EVMEventLake-Node-SDK
 Consumers install a Git tag or immutable commit. A semantic version tag is the
 normal release reference.
 
-Example planned dependency reference:
+Example dependency reference:
 
 ```text
 github:xzsean666/EVMEventLake-Node-SDK#v0.1.0
@@ -656,9 +656,11 @@ Implementation is acceptable only when all of these are demonstrated:
 
 The deterministic local suite demonstrated criteria 4 through 20 where they do
 not require a real PostgreSQL server. The gated live test demonstrated criterion
-19 against Base USDC block `48625053` on 2026-07-14. Criteria 1 and 2 remain part
-of the clean Git-install release check, and criterion 3 still requires a real
-PostgreSQL server in addition to the passing shared `pg-mem` contract suite.
+19 against Base USDC block `48625053` on 2026-07-14. A clean local Git dependency
+consumer demonstrated criterion 2 and the installation lifecycle portion of
+criterion 1. The GitHub-hosted reference remains untestable until push approval,
+and criterion 3 still requires a real PostgreSQL server in addition to the
+passing shared `pg-mem` contract suite.
 
 ## 19. Caller-Owned Usage Patterns
 

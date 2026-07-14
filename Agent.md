@@ -51,9 +51,9 @@ Before starting any step, the agent must:
 | 3 | Context Handoff | `docs/nextsession.md` | No |
 | 4 | Implementation | Source code, package configuration, migrations, tests, examples | Only after explicit user approval |
 
-Step 4 was explicitly approved on 2026-07-14 and implementation is underway.
-Use `docs/nextsession.md` to identify the current implementation phase and do
-not skip unfinished earlier phases.
+Step 4 was explicitly approved on 2026-07-14. The core implementation is
+complete and release verification is underway. Use `docs/nextsession.md` to
+identify remaining release gates and do not skip them.
 
 ## 4. Product Definition
 

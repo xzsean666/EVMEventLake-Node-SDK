@@ -10,7 +10,7 @@ Steps 1 through 3 of the repository workflow are complete and Step 4 is active:
 - Step 2: Product, build, external documentation, and agent rules completed and
   committed.
 - Step 3: This context handoff completed.
-- Step 4: Approved on 2026-07-14; Phases 1 through 9 completed.
+- Step 4: Approved on 2026-07-14; Phases 1 through 10 completed locally.
 
 The repository now contains an ESM package foundation, pinned dependencies,
 strict TypeScript and ESLint configuration, public errors, observability
@@ -19,9 +19,11 @@ decoding, lossless value codec, SQLite/PostgreSQL adapters, migrations, leases,
 atomic range commits, rewind, HTTP RPC transport/pool, and tests.
 Adaptive synchronization, one-shot update orchestration, cancellation, lease
 renewal, reorg recovery, database-only query, versioned pagination, and the
-public client lifecycle are also implemented. Local HTTP end-to-end coverage
-and a gated Base USDC live-chain verification are complete. Git installation
-and final release readiness remain pending.
+public client lifecycle are also implemented. Local HTTP end-to-end coverage,
+a gated Base USDC live-chain verification, a narrow public package surface, and
+clean exact-commit Git installation are complete. Remote GitHub installation
+cannot be tested before a push, and real PostgreSQL verification is unavailable
+in the current environment.
 
 ## 2. Required Read Order
 
@@ -123,7 +125,7 @@ windows, analysis, alerts, notifications, and all downstream domain logic.
 
 - Goals and non-goals.
 - Creation, update, status, query, and close behavior.
-- Configuration and planned defaults.
+- Configuration and implemented defaults.
 - SQLite/PostgreSQL parity requirements.
 - ABI and raw-log preservation behavior.
 - Query/result/error contracts.
@@ -133,13 +135,13 @@ windows, analysis, alerts, notifications, and all downstream domain logic.
 
 `docs/BUILD.md` defines:
 
-- Planned Node.js/TypeScript/pnpm toolchain.
+- Node.js/TypeScript/pnpm toolchain.
 - GitHub tag/commit installation.
 - No npm registry publication.
-- Planned Git-install build and consumer smoke tests.
+- Git-install build and consumer smoke tests.
 - SQLite and PostgreSQL setup.
 - Usage examples, including caller-owned update loops and recent-block logic.
-- Planned test and release workflow.
+- Test and release workflow.
 
 ### Agent workflow
 
@@ -186,9 +188,9 @@ and synchronized documentation update.
 13. Reorg handling uses checkpoints and bounded rewind.
 14. GitHub Git references are the distribution mechanism.
 15. The package is not published to the npm registry.
-16. Planned package name is `@evm-event-lake/node-sdk`.
-17. Planned core libraries are viem, Kysely, better-sqlite3, `pg`, and Vitest,
-    subject to current-version verification in Step 4.
+16. The package name is `@evm-event-lake/node-sdk`.
+17. Core libraries are viem, Kysely, better-sqlite3, `pg`, and Vitest, with
+    exact versions pinned in the manifest and lockfile.
 18. No generic `utils`, `common`, or service-locator module.
 
 ## 7. Step 4 Implementation Progress
@@ -262,24 +264,24 @@ environment-gated real RPC test using Base mainnet (`8453`), USDC
 The sample returned 76 contract logs and 57 decoded Transfer events on
 2026-07-14.
 
-### Phase 10 — GitHub installation and release readiness
+### Phase 10 — GitHub installation and release readiness — completed locally
 
-1. Finalize the Git-install preparation lifecycle.
-2. Verify a clean temporary consumer installs an exact commit.
-3. Verify TypeScript declarations and runtime imports from the installed
-   dependency.
-4. Verify SQLite smoke usage from the installed dependency.
-5. Decide whether release tags need committed `dist/` based on actual package
-   manager behavior.
-6. Update all docs with exact versions and verified commands.
-7. Do not push or publish a tag without explicit user approval.
+Added the root README, repository metadata, a narrow public package surface,
+public sync/query/update types, and `scripts/test-git-install.mjs`. A clean
+temporary consumer installed exact commit `89895f8` through local Git, ran the
+package `prepare` lifecycle, compiled package-root TypeScript imports, and ran a
+SQLite create/query/close smoke test. `better-sqlite3` installed successfully.
+Release tags do not need committed `dist/`; it is built during Git installation.
+
+Remote GitHub reference verification remains impossible until push approval.
+No commit or tag has been pushed.
 
 ## 8. Immediate Next Action
 
-Continue with Phase 10: implement the clean Git dependency consumer smoke test,
-verify package-root runtime and TypeScript imports plus SQLite usage, narrow the
-public export surface, and decide whether release tags need committed `dist/`.
-Perform real PostgreSQL verification if a server becomes available.
+The code implementation is complete. Before publishing a release tag, run the
+shared storage suite against a real PostgreSQL server, obtain explicit approval
+to push, then rerun `test:git-install` against the pushed full commit SHA. Do not
+publish to npm.
 
 ## 9. Risks and Unknowns
 
@@ -289,16 +291,16 @@ Resolved: the package is ESM-only and requires Node.js 22 or newer.
 
 ### 9.2 Git install preparation lifecycle
 
-Still pending. The exact pnpm behavior must be tested from a clean Git
-reference. If build dependencies or preparation scripts are unreliable for
-consumers, release tags may need committed build output. Do not assume either
-path without the consumer smoke test.
+Resolved locally: pnpm installed an exact clean Git commit, installed build
+dependencies, ran `prepare`, generated runtime/declaration output, and passed
+consumer type/runtime/SQLite checks. `dist/` remains uncommitted. The same test
+must be rerun with a GitHub-hosted SHA after push approval.
 
 ### 9.3 Native SQLite dependency
 
-`better-sqlite3` is mature but includes native binaries/build concerns. Verify
-supported Node.js versions, Linux/macOS targets, and Git dependency installation
-before locking the release contract.
+Resolved for the current Linux Node.js 24.2.0 environment and exact Git install.
+macOS, Windows, other CPU architectures, and the Node.js 22 minimum still need
+release-matrix verification when those environments are available.
 
 ### 9.4 Exact dependency versions
 
@@ -345,15 +347,26 @@ RPC may rate limit future runs, so the URL remains configurable.
 Resolved: `close` aborts and waits for the active update cleanup before closing
 storage; the update caller receives the cancellation error.
 
+### 9.12 Real PostgreSQL runtime
+
+Still pending as a release gate. The shared PostgreSQL-dialect suites pass
+through `pg-mem`, but `/var/run/postgresql:5432` has no active server, no local
+`postgres`/`pg_ctl` binary is available, and access to the Docker daemon socket
+is denied in this environment.
+
 ## 10. Verification Already Performed
 
-- `pnpm run verify` passed with 60 tests passing and one gated live test skipped.
+- `pnpm run verify` passed with 61 tests passing and one gated live test skipped.
 - The explicitly enabled Base USDC live RPC test passed.
 - `pnpm run test:integration` passed all local integration files.
+- `pnpm run test:git-install` passed from exact clean commit `89895f8`, including
+  `prepare`, TypeScript declarations, public runtime imports, and SQLite native
+  usage.
 - Required Step 1 and Step 2 documents exist in `docs/`.
 - Root `Agent.md` exists as the repository operating guide.
-- All URLs in `docs/EXTERNAL_DOCS.md` returned HTTP 200 on 2026-07-14.
-- Phases 1 through 8 were committed separately.
+- Official documentation links were reviewed on 2026-07-14; the newly added
+  Base and Circle documentation links returned HTTP 200.
+- Phases 1 through 10 were committed incrementally.
 - No commit was pushed.
 
 ## 11. Do Not Do Next
@@ -365,5 +378,4 @@ storage; the update caller receives the cancellation error.
 - Do not let queries depend on RPC availability.
 - Do not skip an unfetchable block or advance a partial cursor.
 - Do not copy the related Rust service's server architecture into this package.
-- Do not create every planned directory before its implementation phase needs
-  it.
+- Do not add new module directories without first documenting their boundary.
