@@ -10,12 +10,13 @@ Steps 1 through 3 of the repository workflow are complete and Step 4 is active:
 - Step 2: Product, build, external documentation, and agent rules completed and
   committed.
 - Step 3: This context handoff completed.
-- Step 4: Approved on 2026-07-14; Phase 1 completed.
+- Step 4: Approved on 2026-07-14; Phases 1 and 2 completed.
 
 The repository now contains an ESM package foundation, pinned dependencies,
 strict TypeScript and ESLint configuration, public errors, observability
-contracts, configuration validation, and initial unit tests. Storage, RPC,
-synchronization, query, integration, and release phases remain pending.
+contracts, configuration validation, target identity, ABI catalog, event
+decoding, lossless value codec, and unit tests. Storage, RPC, synchronization,
+query, integration, and release phases remain pending.
 
 ## 2. Required Read Order
 
@@ -196,14 +197,13 @@ Completed with ESM-only output, Node.js 22+ support, pinned dependencies,
 registry publication disabled, public error/observability exports, normalized
 configuration, URL redaction, 8 unit tests, and a passing build.
 
-### Phase 2 — Target and ABI
+### Phase 2 — Target and ABI — completed
 
-1. Implement chain/contract target normalization and stable identity.
-2. Implement ABI canonicalization and fingerprinting.
-3. Build the immutable event catalog.
-4. Implement decode outcomes and lossless value codec.
-5. Unit-test overloaded, anonymous, unknown, malformed, tuple, array, and bigint
-   cases.
+Completed with a stable lowercase target key, order-independent ABI fingerprint,
+overload-aware event signatures/selectors, anonymous-event decoding, explicit
+decoded/unknown/decode-failed outcomes, indexed topic preservation, and a
+deterministic bigint-safe value codec. The full suite currently has 17 passing
+tests.
 
 ### Phase 3 — Storage contract and SQLite
 
@@ -277,8 +277,8 @@ configuration, URL redaction, 8 unit tests, and a passing build.
 
 ## 8. Immediate Next Action
 
-Continue with Phase 2: contract target identity, ABI catalog, decoding outcomes,
-and lossless value codecs. Do not start storage until Phase 2 tests pass.
+Continue with Phase 3: define the storage contract and implement SQLite with its
+contract tests. Then implement PostgreSQL against the same test behavior.
 
 ## 9. Risks and Unknowns
 

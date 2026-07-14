@@ -8,7 +8,8 @@ Status: Implementation underway
 
 Step 4 was approved on 2026-07-14. The ESM package foundation, strict
 TypeScript configuration, public errors, observability contracts, configuration
-validation, lockfile, and initial unit tests are implemented. Later SDK modules
+validation, target identity, ABI catalog, anonymous and standard event decoding,
+lossless value codec, lockfile, and unit tests are implemented. Later SDK modules
 described below remain in progress until their phases are completed.
 
 ## 2. Planned Toolchain

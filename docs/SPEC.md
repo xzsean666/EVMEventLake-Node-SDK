@@ -584,6 +584,7 @@ The public error hierarchy must distinguish at least:
 - RPC request exhausted error.
 - Unfetchable block error.
 - ABI validation error.
+- Decoded value codec error.
 - Query validation error.
 - Reorg depth exceeded error.
 - Cancellation error.

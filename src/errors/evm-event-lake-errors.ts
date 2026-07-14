@@ -1,6 +1,7 @@
 export type EVMEventLakeErrorCode =
   | "ABI_VALIDATION_ERROR"
   | "CONFIGURATION_VALIDATION_ERROR"
+  | "DECODED_VALUE_CODEC_ERROR"
   | "NO_VALID_RPC_ENDPOINT"
   | "OPERATION_CANCELLED"
   | "QUERY_VALIDATION_ERROR"
@@ -94,6 +95,12 @@ export class UnfetchableBlockError extends EVMEventLakeError {
 export class AbiValidationError extends EVMEventLakeError {
   public constructor(message: string, options?: EVMEventLakeErrorOptions) {
     super("ABI_VALIDATION_ERROR", message, options);
+  }
+}
+
+export class DecodedValueCodecError extends EVMEventLakeError {
+  public constructor(message: string, options?: EVMEventLakeErrorOptions) {
+    super("DECODED_VALUE_CODEC_ERROR", message, options);
   }
 }
 
