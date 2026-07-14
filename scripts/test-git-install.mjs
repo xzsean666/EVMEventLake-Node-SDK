@@ -5,47 +5,53 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const commit = (
-  await runAndCapture("git", ["rev-parse", "HEAD"], repositoryRoot)
-).trim();
-const status = await runAndCapture(
-  "git",
-  ["status", "--porcelain"],
-  repositoryRoot,
-);
-if (
-  status.trim() !== "" &&
-  process.env.EVM_EVENT_LAKE_ALLOW_DIRTY_GIT_INSTALL_TEST !== "true"
-) {
-  throw new Error(
-    "Git install verification requires a clean repository so the tested commit matches the working tree",
+
+async function main() {
+  const commit = (
+    await runAndCapture("git", ["rev-parse", "HEAD"], repositoryRoot)
+  ).trim();
+  const status = await runAndCapture(
+    "git",
+    ["status", "--porcelain"],
+    repositoryRoot,
   );
-}
+  if (
+    status.trim() !== "" &&
+    process.env.EVM_EVENT_LAKE_ALLOW_DIRTY_GIT_INSTALL_TEST !== "true"
+  ) {
+    throw new Error(
+      "Git install verification requires a clean repository so the tested commit matches the working tree",
+    );
+  }
 
-const localGitUrl = `git+${pathToFileURL(repositoryRoot).href}#${commit}`;
-const installSpec = process.env.EVM_EVENT_LAKE_GIT_INSTALL_SPEC ?? localGitUrl;
-if (!installSpec.includes("#")) {
-  throw new Error("Git install specification must pin a tag or commit");
-}
+  const localGitUrl = `git+${pathToFileURL(repositoryRoot).href}#${commit}`;
+  const installSpec =
+    process.env.EVM_EVENT_LAKE_GIT_INSTALL_SPEC ?? localGitUrl;
+  if (!installSpec.includes("#")) {
+    throw new Error("Git install specification must pin a tag or commit");
+  }
 
-const consumerDirectory = await mkdtemp(
-  join(tmpdir(), "evm-event-lake-git-install-"),
-);
-const keepTemporaryDirectory =
-  process.env.EVM_EVENT_LAKE_KEEP_GIT_INSTALL_TEMP === "true";
+  const consumerDirectory = await mkdtemp(
+    join(tmpdir(), "evm-event-lake-git-install-"),
+  );
+  const keepTemporaryDirectory =
+    process.env.EVM_EVENT_LAKE_KEEP_GIT_INSTALL_TEMP === "true";
 
-try {
-  await writeConsumerProject(consumerDirectory, installSpec);
-  await run("pnpm", ["install"], consumerDirectory);
-  await verifyInstalledCommit(consumerDirectory, commit, installSpec);
-  await run("pnpm", ["run", "typecheck"], consumerDirectory);
-  await run("pnpm", ["run", "smoke"], consumerDirectory);
-  process.stdout.write(`Git install verification passed for ${installSpec}\n`);
-} finally {
-  if (keepTemporaryDirectory) {
-    process.stdout.write(`Temporary consumer kept at ${consumerDirectory}\n`);
-  } else {
-    await rm(consumerDirectory, { force: true, recursive: true });
+  try {
+    await writeConsumerProject(consumerDirectory, installSpec);
+    await run("pnpm", ["install"], consumerDirectory);
+    await verifyInstalledCommit(consumerDirectory, commit, installSpec);
+    await run("pnpm", ["run", "typecheck"], consumerDirectory);
+    await run("pnpm", ["run", "smoke"], consumerDirectory);
+    process.stdout.write(
+      `Git install verification passed for ${installSpec}\n`,
+    );
+  } finally {
+    if (keepTemporaryDirectory) {
+      process.stdout.write(`Temporary consumer kept at ${consumerDirectory}\n`);
+    } else {
+      await rm(consumerDirectory, { force: true, recursive: true });
+    }
   }
 }
 
@@ -240,3 +246,5 @@ try {
   await rm(directory, { force: true, recursive: true });
 }
 `;
+
+await main();
