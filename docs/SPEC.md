@@ -582,6 +582,7 @@ The public error hierarchy must distinguish at least:
 - Synchronization locked error.
 - No valid RPC endpoint error.
 - RPC chain mismatch error.
+- RPC request failure with classified category.
 - RPC request exhausted error.
 - Unfetchable block error.
 - ABI validation error.

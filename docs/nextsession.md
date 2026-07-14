@@ -10,14 +10,14 @@ Steps 1 through 3 of the repository workflow are complete and Step 4 is active:
 - Step 2: Product, build, external documentation, and agent rules completed and
   committed.
 - Step 3: This context handoff completed.
-- Step 4: Approved on 2026-07-14; Phases 1 through 4 completed.
+- Step 4: Approved on 2026-07-14; Phases 1 through 5 completed.
 
 The repository now contains an ESM package foundation, pinned dependencies,
 strict TypeScript and ESLint configuration, public errors, observability
 contracts, configuration validation, target identity, ABI catalog, event
 decoding, lossless value codec, SQLite/PostgreSQL adapters, migrations, leases,
-atomic range commits, rewind, and tests. RPC, synchronization, query,
-integration, and release phases remain pending.
+atomic range commits, rewind, HTTP RPC transport/pool, and tests.
+Synchronization, query, integration, and release phases remain pending.
 
 ## 2. Required Read Order
 
@@ -219,14 +219,13 @@ tests through `pg-mem`. SQLite and PostgreSQL-dialect suites both pass. A real
 PostgreSQL server test is still required before a release tag because Docker and
 the local server are unavailable in the current environment.
 
-### Phase 5 — RPC pool
+### Phase 5 — RPC pool — completed
 
-1. Implement HTTP endpoint parsing and credential redaction.
-2. Implement lazy chain ID validation before endpoint use.
-3. Implement bounded request timeout, retry, cooldown, and selection.
-4. Implement explicit RPC error classification.
-5. Unit-test mismatched chain, 429, 5xx, transport, timeout, invalid response,
-   range limit, and response-size cases.
+Implemented native HTTP JSON-RPC requests, caller cancellation and timeout
+separation, lazy chain validation, mismatch exclusion, bounded retry, cooldown,
+deterministic failover, range/timeout handoff to the adaptive layer, result
+validation, metrics, redacted endpoint reporting, and opaque endpoint identity.
+The full suite currently has 40 passing tests.
 
 ### Phase 6 — Synchronization engine
 
@@ -275,8 +274,9 @@ the local server are unavailable in the current environment.
 
 ## 8. Immediate Next Action
 
-Continue with Phase 5: implement HTTP RPC requests, endpoint chain validation,
-failure classification, retry, cooldown, and deterministic failover.
+Continue with Phases 6 and 7: implement range planning, adaptive log fetching,
+one-shot update orchestration, lease renewal, cancellation, checkpoint
+validation, and bounded reorg rewind.
 
 ## 9. Risks and Unknowns
 
