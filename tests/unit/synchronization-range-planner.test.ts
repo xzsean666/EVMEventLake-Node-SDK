@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   planSynchronizationRanges,
   splitSynchronizationRange,
-} from "../../src/index.js";
+} from "../support/internal-exports.js";
 
 describe("synchronization range planner", () => {
   it("plans gap-free inclusive preferred ranges", () => {

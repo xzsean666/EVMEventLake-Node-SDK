@@ -6,7 +6,7 @@ import {
   QueryValidationError,
   createContractTarget,
   type StorageAdapter,
-} from "../../src/index.js";
+} from "../support/internal-exports.js";
 
 const catalog = new EventCatalog([
   {

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { RpcRequestFailure, classifyRpcFailure } from "../../src/index.js";
+import {
+  RpcRequestFailure,
+  classifyRpcFailure,
+} from "../support/internal-exports.js";
 
 describe("classifyRpcFailure", () => {
   it("distinguishes range, timeout, rate, server, and ordinary RPC failures", () => {

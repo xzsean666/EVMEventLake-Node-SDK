@@ -28,7 +28,7 @@ import {
   type RpcPoolMetrics,
   type StorageAdapter,
   type UpdateRpcClient,
-} from "../../src/index.js";
+} from "../support/internal-exports.js";
 
 const abi = [
   {

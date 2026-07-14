@@ -7,7 +7,7 @@ import {
   RpcRequestFailure,
   type RpcTransport,
   type RpcTransportRequest,
-} from "../../src/index.js";
+} from "../support/internal-exports.js";
 
 class FakeRpcTransport implements RpcTransport {
   public readonly requests: RpcTransportRequest[] = [];

@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterAll } from "vitest";
 
-import { createSqliteStorageAdapter } from "../../src/index.js";
+import { createSqliteStorageAdapter } from "../support/internal-exports.js";
 import { runStorageAdapterContract } from "./storage-adapter.contract.js";
 
 const temporaryDirectories: string[] = [];

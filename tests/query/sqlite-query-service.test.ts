@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterAll } from "vitest";
 
-import { createSqliteStorageAdapter } from "../../src/index.js";
+import { createSqliteStorageAdapter } from "../support/internal-exports.js";
 import { runQueryServiceContract } from "./query-service.contract.js";
 
 const directories: string[] = [];

@@ -4,7 +4,7 @@ import {
   HttpEvmRpcClient,
   OperationCancelledError,
   RpcRequestFailure,
-} from "../../src/index.js";
+} from "../support/internal-exports.js";
 
 describe("HttpEvmRpcClient", () => {
   afterEach(() => {

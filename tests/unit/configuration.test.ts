@@ -7,7 +7,7 @@ import {
   parseDatabaseConfiguration,
   redactUrl,
   validateSdkOptions,
-} from "../../src/index.js";
+} from "../support/internal-exports.js";
 
 const transferAbi = [
   {

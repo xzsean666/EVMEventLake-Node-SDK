@@ -3,6 +3,14 @@
   "version": "0.1.0",
   "description": "One-shot EVM contract event log synchronization and database query SDK",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xzsean666/EVMEventLake-Node-SDK.git"
+  },
+  "homepage": "https://github.com/xzsean666/EVMEventLake-Node-SDK#readme",
+  "bugs": {
+    "url": "https://github.com/xzsean666/EVMEventLake-Node-SDK/issues"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -31,8 +39,8 @@
     "prebuild": "pnpm run clean",
     "build": "tsc -p tsconfig.build.json",
     "prepare": "tsc -p tsconfig.build.json",
-    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\" \"*.{json,js}\"",
-    "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\" \"*.{json,js}\"",
+    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\" \"scripts/**/*.mjs\" \"*.{json,js}\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\" \"scripts/**/*.mjs\" \"*.{json,js}\"",
     "lint": "eslint src tests eslint.config.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",

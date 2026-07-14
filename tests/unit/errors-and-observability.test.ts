@@ -4,7 +4,7 @@ import {
   ConfigurationValidationError,
   emitLogSafely,
   emitProgressSafely,
-} from "../../src/index.js";
+} from "../support/internal-exports.js";
 
 describe("public errors", () => {
   it("preserves stable error codes and frozen safe context", () => {

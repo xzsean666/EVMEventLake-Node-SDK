@@ -17,12 +17,12 @@ import type {
 import { RpcPool } from "../rpc/rpc-pool.js";
 import { createStorageAdapter } from "../storage/create-storage-adapter.js";
 import type { StorageAdapter } from "../storage/storage-adapter.js";
-import type { TargetState } from "../storage/storage-models.js";
 import type {
   UpdateOptions,
   UpdateResult,
 } from "../synchronization/synchronization-result.js";
 import { UpdateService } from "../synchronization/update-service.js";
+import type { SyncStatus } from "./sync-status.js";
 
 export class EVMEventLake {
   public readonly events: EventQueryApi;
@@ -138,7 +138,7 @@ export class EVMEventLake {
     }
   }
 
-  public async getSyncStatus(): Promise<TargetState> {
+  public async getSyncStatus(): Promise<SyncStatus> {
     this.#assertOpen();
     const state = await this.#storage.getTargetState(this.#targetKey);
     if (state === null) {

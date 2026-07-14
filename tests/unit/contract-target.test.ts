@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { createContractTarget, createTargetKey } from "../../src/index.js";
+import {
+  createContractTarget,
+  createTargetKey,
+} from "../support/internal-exports.js";
 
 describe("contract target identity", () => {
   it("creates a stable lowercase chain and contract key", () => {

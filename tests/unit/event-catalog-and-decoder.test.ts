@@ -12,7 +12,7 @@ import {
   canonicalizeAbi,
   decodeRawEventLog,
   type RawEvmLog,
-} from "../../src/index.js";
+} from "../support/internal-exports.js";
 
 const transferAbi = [
   {

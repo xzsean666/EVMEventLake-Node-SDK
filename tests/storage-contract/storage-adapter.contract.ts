@@ -10,7 +10,7 @@ import {
   encodeDecodedValue,
   type StorageAdapter,
   type StoredEventLog,
-} from "../../src/index.js";
+} from "../support/internal-exports.js";
 
 const abi = [
   {

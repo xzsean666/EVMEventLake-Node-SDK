@@ -1,7 +1,7 @@
 import type { Address, Hex } from "viem";
 
 import type { BlockNumberInput } from "../configuration/sdk-options.js";
-import type { StoredDecodeStatus } from "../storage/storage-models.js";
+export type EventDecodeStatus = "decode_failed" | "decoded" | "unknown";
 
 export interface BlockNumberRangeFilter {
   readonly greaterThanOrEqual?: BlockNumberInput;
@@ -31,7 +31,7 @@ export interface EventRecord {
   readonly chainId: number;
   readonly contractAddress: Address;
   readonly data: Hex;
-  readonly decodeStatus: StoredDecodeStatus;
+  readonly decodeStatus: EventDecodeStatus;
   readonly eventName: string | null;
   readonly eventSignature: string | null;
   readonly logIndex: number;

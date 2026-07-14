@@ -4,7 +4,7 @@ import {
   DecodedValueCodecError,
   decodeDecodedValue,
   encodeDecodedValue,
-} from "../../src/index.js";
+} from "../support/internal-exports.js";
 
 describe("decoded value codec", () => {
   it("round-trips bigint, tuples, arrays, bytes, and primitive values", () => {

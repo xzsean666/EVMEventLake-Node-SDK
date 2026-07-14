@@ -9,7 +9,7 @@ import {
   createRpcEndpointIdentity,
   type AdaptiveLogRpcClient,
   type RpcLogsResult,
-} from "../../src/index.js";
+} from "../support/internal-exports.js";
 
 const contractAddress = "0x0000000000000000000000000000000000000001" as Address;
 

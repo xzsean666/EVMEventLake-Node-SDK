@@ -1,4 +1,3 @@
-import type { RewindResult } from "../storage/storage-models.js";
 import type { BlockNumberInput } from "../configuration/sdk-options.js";
 
 export interface UpdateOptions {
@@ -7,7 +6,9 @@ export interface UpdateOptions {
   readonly toBlock?: BlockNumberInput;
 }
 
-export interface UpdateRewindResult extends RewindResult {
+export interface UpdateRewindResult {
+  readonly deletedLogs: number;
+  readonly nextBlock: bigint;
   readonly rewindFromBlock: bigint;
 }
 

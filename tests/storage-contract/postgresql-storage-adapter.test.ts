@@ -1,7 +1,7 @@
 import { newDb } from "pg-mem";
 import type { Pool } from "pg";
 
-import { createPostgresqlStorageAdapter } from "../../src/index.js";
+import { createPostgresqlStorageAdapter } from "../support/internal-exports.js";
 import { runStorageAdapterContract } from "./storage-adapter.contract.js";
 
 runStorageAdapterContract("PostgreSQL", () => {
