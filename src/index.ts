@@ -6,3 +6,8 @@ export * from "./configuration/validate-sdk-options.js";
 export * from "./contract-target/contract-target.js";
 export * from "./errors/evm-event-lake-errors.js";
 export * from "./observability/sdk-logger.js";
+export * from "./storage/create-storage-adapter.js";
+export * from "./storage/postgresql/postgresql-storage-adapter.js";
+export * from "./storage/sqlite/sqlite-storage-adapter.js";
+export * from "./storage/storage-adapter.js";
+export * from "./storage/storage-models.js";

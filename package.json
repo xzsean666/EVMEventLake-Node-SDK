@@ -21,6 +21,11 @@
     "node": ">=22"
   },
   "packageManager": "pnpm@10.12.1",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3"
+    ]
+  },
   "scripts": {
     "clean": "node scripts/clean-dist.mjs",
     "prebuild": "pnpm run clean",
@@ -52,6 +57,7 @@
     "@types/pg": "8.20.0",
     "eslint": "9.39.5",
     "globals": "17.7.0",
+    "pg-mem": "3.0.14",
     "prettier": "3.9.5",
     "typescript": "5.9.3",
     "typescript-eslint": "8.64.0",

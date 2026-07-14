@@ -222,6 +222,18 @@ Step 4.
   test execution.
 - Verified: 2026-07-14.
 
+### pg-mem
+
+- Selected version: `3.0.14`.
+- Repository and docs: <https://github.com/oguimbal/pg-mem>
+- Relationship: Development dependency only.
+- SDK area: PostgreSQL storage contract tests.
+- Why used: Executes PostgreSQL-dialect SQL through a `pg`-compatible in-memory
+  adapter when a real PostgreSQL server is unavailable in the local workspace.
+- Important limitation: It does not replace required real PostgreSQL release
+  verification.
+- Verified: 2026-07-14.
+
 ## 8. Mature Design References
 
 These projects are references only. They must not become runtime dependencies

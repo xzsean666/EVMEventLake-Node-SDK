@@ -239,6 +239,8 @@ Every behavior belongs to a named responsibility.
 │   ├── storage/
 │   │   ├── storage-adapter.ts
 │   │   ├── storage-models.ts
+│   │   ├── storage-database-schema.ts
+│   │   ├── sql-storage-adapter.ts
 │   │   ├── sqlite/
 │   │   └── postgresql/
 │   ├── query/
@@ -466,6 +468,11 @@ Dependencies:
 
 No adapter-specific type may escape the storage boundary. Both adapters must
 pass the same storage contract test suite.
+
+Shared SQL behavior is composed through `sql-storage-adapter`; SQLite and
+PostgreSQL entry modules own driver construction and dialect-specific runtime
+settings. This shared component is storage-domain logic, not a generic utility
+or an inheritance base class.
 
 ### 6.8 `query`
 

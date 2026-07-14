@@ -577,6 +577,7 @@ The public error hierarchy must distinguish at least:
 - Configuration validation error.
 - Unsupported database URL error.
 - Storage initialization or migration error.
+- Storage consistency error.
 - Target metadata conflict error.
 - Synchronization locked error.
 - No valid RPC endpoint error.

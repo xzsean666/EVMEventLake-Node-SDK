@@ -9,6 +9,7 @@ export type EVMEventLakeErrorCode =
   | "RPC_CHAIN_MISMATCH"
   | "RPC_REQUEST_EXHAUSTED"
   | "STORAGE_INITIALIZATION_ERROR"
+  | "STORAGE_CONSISTENCY_ERROR"
   | "SYNCHRONIZATION_LOCKED"
   | "TARGET_METADATA_CONFLICT"
   | "UNFETCHABLE_BLOCK"
@@ -53,6 +54,12 @@ export class UnsupportedDatabaseUrlError extends EVMEventLakeError {
 export class StorageInitializationError extends EVMEventLakeError {
   public constructor(message: string, options?: EVMEventLakeErrorOptions) {
     super("STORAGE_INITIALIZATION_ERROR", message, options);
+  }
+}
+
+export class StorageConsistencyError extends EVMEventLakeError {
+  public constructor(message: string, options?: EVMEventLakeErrorOptions) {
+    super("STORAGE_CONSISTENCY_ERROR", message, options);
   }
 }
 

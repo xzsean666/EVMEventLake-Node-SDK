@@ -9,8 +9,9 @@ Status: Implementation underway
 Step 4 was approved on 2026-07-14. The ESM package foundation, strict
 TypeScript configuration, public errors, observability contracts, configuration
 validation, target identity, ABI catalog, anonymous and standard event decoding,
-lossless value codec, lockfile, and unit tests are implemented. Later SDK modules
-described below remain in progress until their phases are completed.
+lossless value codec, SQLite/PostgreSQL storage adapters, lockfile, and
+unit/contract tests are implemented. Later RPC, synchronization, query,
+integration, and release modules remain in progress.
 
 ## 2. Planned Toolchain
 
@@ -91,6 +92,9 @@ pnpm install --frozen-lockfile
 
 The repository must commit `pnpm-lock.yaml` and pin the package manager version
 through the package manifest.
+
+`pnpm-workspace.yaml` explicitly allows the `better-sqlite3` native install
+script. No other dependency build script is allowlisted by default.
 
 Expected quality commands:
 
@@ -375,6 +379,11 @@ pnpm run test:storage:postgresql
 pnpm run test:integration
 pnpm run test:git-install
 ```
+
+The PostgreSQL storage contract currently runs through `pg-mem` using Kysely's
+PostgreSQL dialect and the standard `pg.Pool` interface. A real PostgreSQL
+server verification remains required before release; `pg-mem` is not presented
+as production database evidence.
 
 Planned gated live test:
 

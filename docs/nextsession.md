@@ -10,13 +10,14 @@ Steps 1 through 3 of the repository workflow are complete and Step 4 is active:
 - Step 2: Product, build, external documentation, and agent rules completed and
   committed.
 - Step 3: This context handoff completed.
-- Step 4: Approved on 2026-07-14; Phases 1 and 2 completed.
+- Step 4: Approved on 2026-07-14; Phases 1 through 4 completed.
 
 The repository now contains an ESM package foundation, pinned dependencies,
 strict TypeScript and ESLint configuration, public errors, observability
 contracts, configuration validation, target identity, ABI catalog, event
-decoding, lossless value codec, and unit tests. Storage, RPC, synchronization,
-query, integration, and release phases remain pending.
+decoding, lossless value codec, SQLite/PostgreSQL adapters, migrations, leases,
+atomic range commits, rewind, and tests. RPC, synchronization, query,
+integration, and release phases remain pending.
 
 ## 2. Required Read Order
 
@@ -205,21 +206,18 @@ decoded/unknown/decode-failed outcomes, indexed topic preservation, and a
 deterministic bigint-safe value codec. The full suite currently has 17 passing
 tests.
 
-### Phase 3 — Storage contract and SQLite
+### Phase 3 — Storage contract and SQLite — completed
 
-1. Define storage models and adapter interface.
-2. Design forward migrations from the logical model.
-3. Implement SQLite initialization, target metadata, ABI versions, event rows,
-   parameter rows, checkpoints, cursor, leases, rewind, and queries.
-4. Add the reusable storage contract test suite.
-5. Verify atomic range commits, idempotency, and expired-lease recovery.
+Implemented schema migration, target and ABI registration, fixed-width portable
+block keys, logs and indexed parameters, checkpoints, target-scoped leases,
+atomic range commits, rewind, query primitives, WAL mode, and contract tests.
 
-### Phase 4 — PostgreSQL
+### Phase 4 — PostgreSQL — completed with release verification pending
 
-1. Implement the PostgreSQL adapter without leaking dialect types.
-2. Run the same storage contract tests unchanged.
-3. Verify concurrent different-target updates and same-target lease exclusion.
-4. Document any operational PostgreSQL requirement.
+Implemented the standard `pg.Pool` adapter and ran the same six storage contract
+tests through `pg-mem`. SQLite and PostgreSQL-dialect suites both pass. A real
+PostgreSQL server test is still required before a release tag because Docker and
+the local server are unavailable in the current environment.
 
 ### Phase 5 — RPC pool
 
@@ -277,8 +275,8 @@ tests.
 
 ## 8. Immediate Next Action
 
-Continue with Phase 3: define the storage contract and implement SQLite with its
-contract tests. Then implement PostgreSQL against the same test behavior.
+Continue with Phase 5: implement HTTP RPC requests, endpoint chain validation,
+failure classification, retry, cooldown, and deterministic failover.
 
 ## 9. Risks and Unknowns
 
