@@ -2,7 +2,7 @@
 
 Version: 1.0
 
-Status: Implementation underway
+Status: Core implementation complete; release verification underway
 
 ## 1. Product Summary
 
@@ -653,6 +653,12 @@ Implementation is acceptable only when all of these are demonstrated:
 18. Ordinary tests run without live network access.
 19. An opt-in live test indexes and queries a documented real-chain sample.
 20. No background timer remains after `update` returns or `close` completes.
+
+The deterministic local suite demonstrated criteria 4 through 20 where they do
+not require a real PostgreSQL server. The gated live test demonstrated criterion
+19 against Base USDC block `48625053` on 2026-07-14. Criteria 1 and 2 remain part
+of the clean Git-install release check, and criterion 3 still requires a real
+PostgreSQL server in addition to the passing shared `pg-mem` contract suite.
 
 ## 19. Caller-Owned Usage Patterns
 

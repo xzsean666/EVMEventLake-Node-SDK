@@ -10,7 +10,7 @@ Steps 1 through 3 of the repository workflow are complete and Step 4 is active:
 - Step 2: Product, build, external documentation, and agent rules completed and
   committed.
 - Step 3: This context handoff completed.
-- Step 4: Approved on 2026-07-14; Phases 1 through 8 completed.
+- Step 4: Approved on 2026-07-14; Phases 1 through 9 completed.
 
 The repository now contains an ESM package foundation, pinned dependencies,
 strict TypeScript and ESLint configuration, public errors, observability
@@ -19,8 +19,9 @@ decoding, lossless value codec, SQLite/PostgreSQL adapters, migrations, leases,
 atomic range commits, rewind, HTTP RPC transport/pool, and tests.
 Adaptive synchronization, one-shot update orchestration, cancellation, lease
 renewal, reorg recovery, database-only query, versioned pagination, and the
-public client lifecycle are also implemented. Live verification and release
-phases remain pending.
+public client lifecycle are also implemented. Local HTTP end-to-end coverage
+and a gated Base USDC live-chain verification are complete. Git installation
+and final release readiness remain pending.
 
 ## 2. Required Read Order
 
@@ -251,12 +252,15 @@ SQLite/PostgreSQL query parity, offline client creation/query, one-shot update,
 idempotent close, and closed-client protection. The full suite currently has 58
 passing tests.
 
-### Phase 9 — Integration and live verification
+### Phase 9 — Integration and live verification — completed
 
-1. Add local end-to-end tests for create, update, resume, query, and close.
-2. Select and document a stable real-chain contract and block sample.
-3. Add opt-in live RPC tests with explicit environment gates.
-4. Verify multiple endpoints and an intentional bad-endpoint failover path.
+Added local HTTP end-to-end coverage for an intentional 503 endpoint,
+automatic endpoint failover, adaptive block-range splitting, ABI decode,
+SQLite persistence/query, and closing during an active update. Added an
+environment-gated real RPC test using Base mainnet (`8453`), USDC
+`0x833589fcd6edb6e08f4c7c32d4f71b54bda02913`, and fixed block `48625053`.
+The sample returned 76 contract logs and 57 decoded Transfer events on
+2026-07-14.
 
 ### Phase 10 — GitHub installation and release readiness
 
@@ -272,9 +276,10 @@ passing tests.
 
 ## 8. Immediate Next Action
 
-Continue with Phase 9: add full client HTTP integration tests and run a gated
-real-chain E2E against a stable contract/block sample. Then perform real
-PostgreSQL verification if a server can be made available.
+Continue with Phase 10: implement the clean Git dependency consumer smoke test,
+verify package-root runtime and TypeScript imports plus SQLite usage, narrow the
+public export surface, and decide whether release tags need committed `dist/`.
+Perform real PostgreSQL verification if a server becomes available.
 
 ## 9. Risks and Unknowns
 
@@ -284,10 +289,10 @@ Resolved: the package is ESM-only and requires Node.js 22 or newer.
 
 ### 9.2 Git install preparation lifecycle
 
-The exact pnpm behavior must be tested from a clean Git reference. If build
-dependencies or preparation scripts are unreliable for consumers, release tags
-may need committed build output. Do not assume either path without the consumer
-smoke test.
+Still pending. The exact pnpm behavior must be tested from a clean Git
+reference. If build dependencies or preparation scripts are unreliable for
+consumers, release tags may need committed build output. Do not assume either
+path without the consumer smoke test.
 
 ### 9.3 Native SQLite dependency
 
@@ -330,9 +335,10 @@ operation.
 
 ### 9.10 Live test sample
 
-No live chain/contract/block sample has been selected for this Node SDK. The
-related Rust project has a Base USDC precedent, but it must be revalidated before
-reuse.
+Resolved: the gated sample is Base mainnet chain `8453`, USDC contract
+`0x833589fcd6edb6e08f4c7c32d4f71b54bda02913`, block `48625053`. It produced
+76 contract logs and 57 Transfer events when verified on 2026-07-14. The public
+RPC may rate limit future runs, so the URL remains configurable.
 
 ### 9.11 Close during update
 
@@ -341,12 +347,13 @@ storage; the update caller receives the cancellation error.
 
 ## 10. Verification Already Performed
 
-- `git diff --check` passed for Steps 1 and 2.
+- `pnpm run verify` passed with 60 tests passing and one gated live test skipped.
+- The explicitly enabled Base USDC live RPC test passed.
+- `pnpm run test:integration` passed all local integration files.
 - Required Step 1 and Step 2 documents exist in `docs/`.
 - Root `Agent.md` exists as the repository operating guide.
 - All URLs in `docs/EXTERNAL_DOCS.md` returned HTTP 200 on 2026-07-14.
-- No package, source, migration, or test implementation was created.
-- Step 1 and Step 2 were committed separately.
+- Phases 1 through 8 were committed separately.
 - No commit was pushed.
 
 ## 11. Do Not Do Next

@@ -2,7 +2,7 @@
 
 Version: 1.0
 
-Status: Implementation underway
+Status: Core implementation complete; release verification underway
 
 ## 1. Current Repository State
 
@@ -11,13 +11,13 @@ TypeScript configuration, public errors, observability contracts, configuration
 validation, target identity, ABI catalog, anonymous and standard event decoding,
 lossless value codec, SQLite/PostgreSQL storage adapters, HTTP JSON-RPC
 transport/pool, adaptive synchronization, checkpoint/reorg recovery, lockfile,
-database-only query/cursor pagination, the public `EVMEventLake` client, and
-unit/contract/integration tests are implemented. Live verification, Git install,
-and final release checks remain in progress.
+database-only query/cursor pagination, the public `EVMEventLake` client, local
+HTTP end-to-end tests, and gated live RPC verification are implemented. Git
+installation and final release checks remain in progress.
 
-## 2. Planned Toolchain
+## 2. Toolchain
 
-| Tool | Planned requirement | Purpose |
+| Tool | Requirement | Purpose |
 | --- | --- | --- |
 | Node.js | 22 or newer; development verified with 24.2.0 | Runtime |
 | TypeScript | 5.9.3 | Source and declarations |
@@ -72,7 +72,7 @@ can resolve to different code.
 
 ### 3.3 Git-install build contract
 
-The future package must work when the package manager:
+The package must work when the package manager:
 
 1. Clones the requested Git reference.
 2. Installs the package's build dependencies.
@@ -83,9 +83,9 @@ The future package must work when the package manager:
 Release verification must test this exact path from a clean temporary consumer
 project. A local workspace link is not sufficient release evidence.
 
-## 4. Planned Local Development Setup
+## 4. Local Development Setup
 
-After Step 4 creates the package, the expected setup will be:
+Install the repository dependencies with:
 
 ```bash
 corepack enable
@@ -98,7 +98,7 @@ through the package manifest.
 `pnpm-workspace.yaml` explicitly allows the `better-sqlite3` native install
 script. No other dependency build script is allowlisted by default.
 
-Expected quality commands:
+Quality commands:
 
 ```bash
 pnpm run format:check
@@ -108,18 +108,18 @@ pnpm run test
 pnpm run build
 ```
 
-Expected full verification command:
+Full deterministic verification command:
 
 ```bash
 pnpm run verify
 ```
 
-`verify` should compose deterministic local checks. It must not run paid or live
-RPC tests unless an explicit live-test flag is set.
+`verify` composes deterministic local checks. It does not run live RPC tests;
+network access requires the explicit live-test flag described below.
 
-## 5. Planned Build Output
+## 5. Build Output
 
-The build must produce a `dist/` package surface containing:
+The build produces a `dist/` package surface containing:
 
 - Runtime JavaScript.
 - Source maps.
@@ -130,9 +130,9 @@ The package must not expose internal adapter or synchronization files through
 accidental deep imports. Consumers import from the package root unless a
 documented subpath export is intentionally added.
 
-Whether `dist/` is committed must be decided during implementation based on the
-verified Git-install lifecycle. The release invariant is that a clean tag
-installs successfully; source layout preference is secondary.
+Whether `dist/` must be committed will be decided from the clean Git-install
+smoke test. The release invariant is that a clean tag installs successfully;
+source layout preference is secondary.
 
 ## 6. Database Preparation
 
@@ -180,7 +180,7 @@ SDK creation applies required forward migrations before returning.
 - A future breaking schema migration requires release notes and a tested upgrade
   path.
 
-## 7. Planned Basic Usage
+## 7. Basic Usage
 
 The intended public lifecycle is explicit asynchronous creation, one-shot
 update, database query, and close.
@@ -224,7 +224,7 @@ try {
 }
 ```
 
-This is a planned usage contract, not current runnable code.
+This is the implemented public lifecycle.
 
 ## 8. Caller-Owned Continuous Update Pattern
 
@@ -282,7 +282,7 @@ if (status.syncedThroughBlock !== null) {
 This calculation remains in caller code. The query itself remains a normal,
 composable database range query.
 
-## 10. Planned Query Examples
+## 10. Query Examples
 
 ### 10.1 Transaction hash
 
@@ -370,9 +370,9 @@ Start with the default preferred range. Override it when a provider or dense
 contract benefits from a different initial request size. Adaptive splitting is
 a safety mechanism, not a reason to choose an unnecessarily large range.
 
-## 12. Planned Test Commands
+## 12. Test Commands
 
-Expected focused suites:
+Focused suites:
 
 ```bash
 pnpm run test:unit
@@ -387,18 +387,30 @@ PostgreSQL dialect and the standard `pg.Pool` interface. A real PostgreSQL
 server verification remains required before release; `pg-mem` is not presented
 as production database evidence.
 
-Planned gated live test:
+The live RPC test is opt-in and uses a documented stable Base USDC sample:
+
+- Chain: Base mainnet (`8453`).
+- Contract: USDC (`0x833589fcd6edb6e08f4c7c32d4f71b54bda02913`).
+- Inclusive sample block: `48625053` (`0x2e5f59d`).
+- Verified sample contents on 2026-07-14: 76 contract logs, including 57
+  decoded `Transfer(address,address,uint256)` events.
 
 ```bash
 EVM_EVENT_LAKE_RUN_LIVE_RPC_TESTS=true \
-EVM_EVENT_LAKE_LIVE_RPC_URL=https://example-rpc \
+EVM_EVENT_LAKE_LIVE_RPC_URL=https://mainnet.base.org \
 pnpm run test:live-rpc
 ```
 
-The final environment variable names must be confirmed in Step 4 and then kept
-consistent here and in the test code.
+The public Base endpoint is intended for development and rate limited. Override
+`EVM_EVENT_LAKE_LIVE_RPC_URL` with a trusted Base HTTP RPC endpoint when needed.
+Ordinary `pnpm run test` runs the file in skipped mode and requires no network.
 
-## 13. Planned Git Installation Verification
+The local HTTP integration suite also verifies an intentional 503 endpoint,
+automatic endpoint failover, adaptive `eth_getLogs` range splitting, ABI
+decoding, SQLite persistence/query, and `close()` cancellation of an active
+update.
+
+## 13. Git Installation Verification
 
 For each release candidate:
 

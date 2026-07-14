@@ -68,7 +68,27 @@ or rate limits than the base protocol. Provider-specific operational limits
 should be added here only when the SDK or its tests intentionally depend on a
 specific provider.
 
-## 4. Planned Runtime Libraries
+### Base mainnet live-test network
+
+- Connect to Base: <https://docs.base.org/base-chain/quickstart/connecting-to-base>
+- Base `eth_getLogs` reference:
+  <https://docs.base.org/base-chain/api-reference/ethereum-json-rpc-api/eth_getLogs>
+- Circle USDC contract addresses:
+  <https://developers.circle.com/stablecoins/usdc-contract-addresses>
+- Relationship: External protocol and gated live-test fixture only.
+- Runtime dependency: No; ordinary SDK tests do not contact Base.
+- SDK areas: `tests/live-rpc`, `rpc`, `synchronization`, `abi`, SQLite storage,
+  and query verification.
+- Why used: Base USDC block `48625053` is a fixed public sample that exercises
+  real `eth_getLogs`, ABI decoding, persistence, and database-only query.
+- Verified values: Base chain ID `8453`, USDC address
+  `0x833589fcd6edb6e08f4c7c32d4f71b54bda02913`, 76 contract logs and 57
+  `Transfer` logs in the sample block.
+- Operational note: `https://mainnet.base.org` is a rate-limited public RPC and
+  can be replaced through `EVM_EVENT_LAKE_LIVE_RPC_URL`.
+- Verified: 2026-07-14.
+
+## 4. Runtime Libraries
 
 Runtime versions are pinned in `package.json` and `pnpm-lock.yaml`.
 
@@ -81,9 +101,9 @@ Runtime versions are pinned in `package.json` and `pnpm-lock.yaml`.
 - Decode event log: <https://viem.sh/docs/contract/decodeEventLog>
 - Fallback transport: <https://viem.sh/docs/clients/transports/fallback>
 - HTTP transport: <https://viem.sh/docs/clients/transports/http>
-- Relationship: Planned runtime dependency.
+- Relationship: Runtime dependency.
 - SDK areas: `rpc`, `abi`, `contract-target`.
-- Why planned: Provides maintained EVM JSON-RPC, address, ABI, topic, and event
+- Why used: Provides maintained EVM JSON-RPC, address, ABI, topic, and event
   decoding primitives. The SDK still owns endpoint eligibility, range splitting,
   retries, and durable synchronization semantics.
 - Verified: 2026-07-14.
@@ -95,9 +115,9 @@ Runtime versions are pinned in `package.json` and `pnpm-lock.yaml`.
 - Main docs: <https://kysely.dev/docs/intro>
 - Migrations: <https://kysely.dev/docs/migrations>
 - API docs: <https://kysely-org.github.io/kysely-apidoc/>
-- Relationship: Planned runtime dependency.
+- Relationship: Runtime dependency.
 - SDK areas: `storage/sqlite`, `storage/postgresql`, query compilation.
-- Why planned: Provides typed SQL construction while keeping database execution
+- Why used: Provides typed SQL construction while keeping database execution
   and dialect-specific behavior explicit.
 - Verified: 2026-07-14.
 
@@ -110,9 +130,9 @@ by this repository and tested against both databases.
 
 - Repository: <https://github.com/WiseLibs/better-sqlite3>
 - API docs: <https://github.com/WiseLibs/better-sqlite3/blob/master/docs/api.md>
-- Relationship: Planned runtime dependency for SQLite installations.
+- Relationship: Runtime dependency for SQLite installations.
 - SDK area: `storage/sqlite` only.
-- Why planned: Mature embedded SQLite driver supported by Kysely's SQLite
+- Why used: Mature embedded SQLite driver supported by Kysely's SQLite
   dialect.
 - Verified: 2026-07-14.
 
@@ -123,9 +143,9 @@ by this repository and tested against both databases.
 - Main docs: <https://node-postgres.com/>
 - Features: <https://node-postgres.com/features/connecting>
 - API docs: <https://node-postgres.com/apis/pool>
-- Relationship: Planned runtime dependency for PostgreSQL installations.
+- Relationship: Runtime dependency for PostgreSQL installations.
 - SDK area: `storage/postgresql` only.
-- Why planned: Standard PostgreSQL driver for Node.js and Kysely's PostgreSQL
+- Why used: Standard PostgreSQL driver for Node.js and Kysely's PostgreSQL
   dialect.
 - Verified: 2026-07-14.
 
@@ -208,7 +228,7 @@ Step 4.
   lifecycle conventions even though this SDK is not published to npm.
 - Verified: 2026-07-14.
 
-## 7. Planned Test Tooling
+## 7. Test Tooling
 
 ### Vitest
 
@@ -216,9 +236,9 @@ Step 4.
 
 - Official guide: <https://vitest.dev/guide/>
 - API reference: <https://vitest.dev/api/>
-- Relationship: Planned development dependency.
+- Relationship: Development dependency.
 - SDK areas: Unit, storage contract, integration, and gated live tests.
-- Why planned: TypeScript-native test runner with focused and workspace-friendly
+- Why used: TypeScript-native test runner with focused and workspace-friendly
   test execution.
 - Verified: 2026-07-14.
 
