@@ -73,6 +73,10 @@ export class EventCatalog {
   public findBySignature(signature: string): EventDefinition | undefined {
     return this.events.find((event) => event.signature === signature);
   }
+
+  public findByName(name: string): readonly EventDefinition[] {
+    return Object.freeze(this.events.filter((event) => event.name === name));
+  }
 }
 
 export function canonicalizeAbi(abi: Abi): string {

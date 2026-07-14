@@ -585,6 +585,12 @@ export class SqlStorageAdapter implements StorageAdapter {
       .columns(["target_key", "event_signature"])
       .execute();
     await this.#database.schema
+      .createIndex("event_logs_event_name")
+      .ifNotExists()
+      .on("event_logs")
+      .columns(["target_key", "event_name"])
+      .execute();
+    await this.#database.schema
       .createTable("event_parameters")
       .ifNotExists()
       .addColumn("event_id", "text", (column) =>

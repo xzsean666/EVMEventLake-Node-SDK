@@ -11,8 +11,9 @@ TypeScript configuration, public errors, observability contracts, configuration
 validation, target identity, ABI catalog, anonymous and standard event decoding,
 lossless value codec, SQLite/PostgreSQL storage adapters, HTTP JSON-RPC
 transport/pool, adaptive synchronization, checkpoint/reorg recovery, lockfile,
-and unit/contract/integration tests are implemented. Later query, public client,
-live verification, and release modules remain in progress.
+database-only query/cursor pagination, the public `EVMEventLake` client, and
+unit/contract/integration tests are implemented. Live verification, Git install,
+and final release checks remain in progress.
 
 ## 2. Planned Toolchain
 

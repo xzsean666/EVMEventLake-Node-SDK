@@ -1,5 +1,6 @@
 export type EVMEventLakeErrorCode =
   | "ABI_VALIDATION_ERROR"
+  | "CLIENT_CLOSED"
   | "CONFIGURATION_VALIDATION_ERROR"
   | "DECODED_VALUE_CODEC_ERROR"
   | "NO_VALID_RPC_ENDPOINT"
@@ -44,6 +45,12 @@ export class EVMEventLakeError extends Error {
 export class ConfigurationValidationError extends EVMEventLakeError {
   public constructor(message: string, options?: EVMEventLakeErrorOptions) {
     super("CONFIGURATION_VALIDATION_ERROR", message, options);
+  }
+}
+
+export class ClientClosedError extends EVMEventLakeError {
+  public constructor(message: string, options?: EVMEventLakeErrorOptions) {
+    super("CLIENT_CLOSED", message, options);
   }
 }
 

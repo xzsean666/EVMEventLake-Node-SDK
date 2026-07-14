@@ -202,9 +202,9 @@ The initial API provides:
 - It is safe to call more than once.
 - It does not delete data.
 - It does not wait for or schedule future work.
-- If called during an active update, the active operation must be cancelled or
-  rejected according to one documented implementation choice; it must not
-  silently corrupt a transaction.
+- If called during an active update, it aborts the operation, waits for its
+  lease/transaction cleanup, and then closes storage. The update caller receives
+  the cancellation result.
 
 ## 7. Creation Options
 
@@ -575,6 +575,7 @@ has been reached permanently.
 The public error hierarchy must distinguish at least:
 
 - Configuration validation error.
+- Client closed error.
 - Unsupported database URL error.
 - Storage initialization or migration error.
 - Storage consistency error.

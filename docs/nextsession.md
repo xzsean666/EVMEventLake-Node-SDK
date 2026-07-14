@@ -10,7 +10,7 @@ Steps 1 through 3 of the repository workflow are complete and Step 4 is active:
 - Step 2: Product, build, external documentation, and agent rules completed and
   committed.
 - Step 3: This context handoff completed.
-- Step 4: Approved on 2026-07-14; Phases 1 through 7 completed.
+- Step 4: Approved on 2026-07-14; Phases 1 through 8 completed.
 
 The repository now contains an ESM package foundation, pinned dependencies,
 strict TypeScript and ESLint configuration, public errors, observability
@@ -18,8 +18,9 @@ contracts, configuration validation, target identity, ABI catalog, event
 decoding, lossless value codec, SQLite/PostgreSQL adapters, migrations, leases,
 atomic range commits, rewind, HTTP RPC transport/pool, and tests.
 Adaptive synchronization, one-shot update orchestration, cancellation, lease
-renewal, and reorg recovery are also implemented. Query, public client, live
-verification, and release phases remain pending.
+renewal, reorg recovery, database-only query, versioned pagination, and the
+public client lifecycle are also implemented. Live verification and release
+phases remain pending.
 
 ## 2. Required Read Order
 
@@ -242,13 +243,13 @@ Implemented newest-to-oldest checkpoint validation, shallow reorg rewind and
 replay, depth-exceeded failure, and checkpoint/log hash consistency checks. The
 full suite currently has 49 passing tests.
 
-### Phase 8 — Query API
+### Phase 8 — Query API — completed
 
-1. Implement filter validation and ABI-aware indexed value normalization.
-2. Implement deterministic ascending/descending ordering.
-3. Implement versioned opaque cursor pagination.
-4. Rehydrate lossless values into the documented public result.
-5. Run query parity tests on SQLite and PostgreSQL with RPC disabled.
+Implemented block/transaction/event/indexed filters, ABI width/type validation,
+deterministic order, versioned target/order-scoped cursors, bigint rehydration,
+SQLite/PostgreSQL query parity, offline client creation/query, one-shot update,
+idempotent close, and closed-client protection. The full suite currently has 58
+passing tests.
 
 ### Phase 9 — Integration and live verification
 
@@ -271,9 +272,9 @@ full suite currently has 49 passing tests.
 
 ## 8. Immediate Next Action
 
-Continue with Phase 8: implement public event query validation, ABI-aware indexed
-parameter normalization, versioned cursor pagination, decoded value rehydration,
-and the public `EVMEventLake` lifecycle façade.
+Continue with Phase 9: add full client HTTP integration tests and run a gated
+real-chain E2E against a stable contract/block sample. Then perform real
+PostgreSQL verification if a server can be made available.
 
 ## 9. Risks and Unknowns
 
@@ -335,9 +336,8 @@ reuse.
 
 ### 9.11 Close during update
 
-The specification requires safe behavior but leaves one implementation choice:
-cancel active update or reject close until update completes. Decide and document
-the exact contract before implementing the client façade.
+Resolved: `close` aborts and waits for the active update cleanup before closing
+storage; the update caller receives the cancellation error.
 
 ## 10. Verification Already Performed
 
