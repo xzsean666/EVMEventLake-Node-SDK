@@ -115,7 +115,7 @@ architecture requires the following conceptual surface:
 
 | Operation | Responsibility | External I/O |
 | --- | --- | --- |
-| `create` | Validate options, verify RPC chain identity, initialize storage, register target metadata | RPC and database |
+| `create` | Validate options, build the ABI/RPC configuration, initialize storage, register target metadata | Database |
 | `update` | Perform one finite incremental synchronization run | RPC and database |
 | `getSyncStatus` | Return the durable local cursor and target metadata | Database only |
 | `events.findMany` | Query persisted events with filters and pagination | Database only |
@@ -124,7 +124,10 @@ architecture requires the following conceptual surface:
 
 Initialization uses an asynchronous factory instead of an asynchronous
 constructor or hidden lazy initialization. Database schema initialization and
-RPC chain validation therefore happen at a visible lifecycle boundary.
+target registration therefore happen at a visible lifecycle boundary. RPC
+chain validation happens inside the first explicit RPC operation for each
+endpoint, before that endpoint is allowed to serve synchronization data. This
+keeps database-only queries available while RPC providers are offline.
 
 ### 4.1 Distribution contract
 
@@ -150,7 +153,7 @@ reproducible.
 | --- | --- |
 | `database` | SQLite or PostgreSQL connection URL |
 | `rpcUrls` | Ordered list of HTTP JSON-RPC endpoints |
-| `chainId` | Expected EVM chain identifier; every endpoint must match it |
+| `chainId` | Expected EVM chain identifier; every endpoint used for synchronization must match it |
 | `contractAddress` | The single contract address owned by this instance |
 | `abi` | Complete ABI used to build the event catalog |
 | `startBlock` | First block eligible for synchronization, inclusive |
@@ -342,7 +345,7 @@ Dependencies:
 Purpose:
 
 - Own all HTTP JSON-RPC communication.
-- Verify endpoint chain identity.
+- Verify each endpoint's chain identity before its first synchronization use.
 - Select endpoints, enforce timeouts, retry bounded failures, apply cooldowns,
   and fail over.
 - Classify endpoint failures separately from range-size failures.
@@ -365,7 +368,8 @@ Dependencies:
 - `errors`
 
 The RPC pool contains no background health checker. Endpoint state changes only
-as a result of explicit SDK operations.
+as a result of explicit SDK operations. An endpoint that has not passed chain ID
+validation is never eligible to return a block head, header, or event logs.
 
 ### 6.5 `abi`
 
@@ -544,6 +548,9 @@ Caller calls update once
 Acquire target-scoped synchronization lease
         |
         v
+Validate an RPC endpoint against the configured chain ID
+        |
+        v
 Load target metadata, cursor, and recent checkpoints
         |
         v
@@ -602,7 +609,8 @@ Failure classes have different behavior:
 | Failure class | Required behavior |
 | --- | --- |
 | Provider range or response-size limit | Split the range on the same endpoint |
-| Timeout while range is larger than minimum | Split first; avoid prematurely declaring the endpoint dead |
+| First timeout while range is larger than minimum | Split first; avoid prematurely declaring the endpoint dead |
+| Repeated timeout after the per-range split budget | Fail over instead of splitting an entire interval into slow timeouts |
 | HTTP rate limit or temporary server failure | Apply bounded retry/cooldown, then fail over |
 | Transport or connection failure | Fail over and mark endpoint temporarily unavailable |
 | Chain ID mismatch or invalid protocol response | Reject or disable that endpoint for the instance |
@@ -804,8 +812,10 @@ inside the first query or update would make failures unpredictable.
 
 ### 12.8 Bounded reliability behavior
 
-Retries, range splits, failover, lease waits, and reorg rewinds all have explicit
-bounds and typed terminal errors. The SDK must never loop forever internally.
+Retries, timeout-triggered range splits, failover, lease waits, and reorg rewinds
+all have explicit bounds and typed terminal errors. The SDK must never loop
+forever internally or spend an unbounded number of timeouts proving one endpoint
+is unavailable.
 
 ### 12.9 No generic utility module
 
