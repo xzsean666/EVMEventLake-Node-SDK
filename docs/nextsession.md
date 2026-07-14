@@ -10,14 +10,16 @@ Steps 1 through 3 of the repository workflow are complete and Step 4 is active:
 - Step 2: Product, build, external documentation, and agent rules completed and
   committed.
 - Step 3: This context handoff completed.
-- Step 4: Approved on 2026-07-14; Phases 1 through 5 completed.
+- Step 4: Approved on 2026-07-14; Phases 1 through 7 completed.
 
 The repository now contains an ESM package foundation, pinned dependencies,
 strict TypeScript and ESLint configuration, public errors, observability
 contracts, configuration validation, target identity, ABI catalog, event
 decoding, lossless value codec, SQLite/PostgreSQL adapters, migrations, leases,
 atomic range commits, rewind, HTTP RPC transport/pool, and tests.
-Synchronization, query, integration, and release phases remain pending.
+Adaptive synchronization, one-shot update orchestration, cancellation, lease
+renewal, and reorg recovery are also implemented. Query, public client, live
+verification, and release phases remain pending.
 
 ## 2. Required Read Order
 
@@ -227,23 +229,18 @@ deterministic failover, range/timeout handoff to the adaptive layer, result
 validation, metrics, redacted endpoint reporting, and opaque endpoint identity.
 The full suite currently has 40 passing tests.
 
-### Phase 6 — Synchronization engine
+### Phase 6 — Synchronization engine — completed
 
-1. Implement inclusive range planning.
-2. Implement adaptive log fetching with a minimum range and timeout split
-   budget.
-3. Implement deterministic log validation, ordering, and deduplication.
-4. Implement update orchestration and atomic progress.
-5. Implement cancellation and lease renewal.
-6. Test partial progress, restart/resume, failover, and unfetchable single-block
-   behavior.
+Implemented gap-free range planning, streamed adaptive leaves, range/timeout
+split policy, endpoint cooldown handoff, deterministic validation/order/dedup,
+ABI decoding, atomic leaf commits, partial-progress errors, cancellation,
+request-time lease renewal, observability events, and update metrics.
 
-### Phase 7 — Reorg handling
+### Phase 7 — Reorg handling — completed
 
-1. Implement checkpoint hash lookup.
-2. Implement newest-to-oldest matching checkpoint search.
-3. Implement atomic rewind.
-4. Test shallow reorg recovery and depth-exceeded failure.
+Implemented newest-to-oldest checkpoint validation, shallow reorg rewind and
+replay, depth-exceeded failure, and checkpoint/log hash consistency checks. The
+full suite currently has 49 passing tests.
 
 ### Phase 8 — Query API
 
@@ -274,9 +271,9 @@ The full suite currently has 40 passing tests.
 
 ## 8. Immediate Next Action
 
-Continue with Phases 6 and 7: implement range planning, adaptive log fetching,
-one-shot update orchestration, lease renewal, cancellation, checkpoint
-validation, and bounded reorg rewind.
+Continue with Phase 8: implement public event query validation, ABI-aware indexed
+parameter normalization, versioned cursor pagination, decoded value rehydration,
+and the public `EVMEventLake` lifecycle façade.
 
 ## 9. Risks and Unknowns
 

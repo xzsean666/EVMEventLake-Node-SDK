@@ -14,3 +14,8 @@ export * from "./storage/postgresql/postgresql-storage-adapter.js";
 export * from "./storage/sqlite/sqlite-storage-adapter.js";
 export * from "./storage/storage-adapter.js";
 export * from "./storage/storage-models.js";
+export * from "./synchronization/adaptive-log-fetcher.js";
+export * from "./synchronization/chain-consistency-checker.js";
+export * from "./synchronization/synchronization-range-planner.js";
+export * from "./synchronization/synchronization-result.js";
+export * from "./synchronization/update-service.js";

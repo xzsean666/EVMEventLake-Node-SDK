@@ -10,8 +10,9 @@ Step 4 was approved on 2026-07-14. The ESM package foundation, strict
 TypeScript configuration, public errors, observability contracts, configuration
 validation, target identity, ABI catalog, anonymous and standard event decoding,
 lossless value codec, SQLite/PostgreSQL storage adapters, HTTP JSON-RPC
-transport and pool, lockfile, and unit/contract tests are implemented. Later
-synchronization, query, integration, and release modules remain in progress.
+transport/pool, adaptive synchronization, checkpoint/reorg recovery, lockfile,
+and unit/contract/integration tests are implemented. Later query, public client,
+live verification, and release modules remain in progress.
 
 ## 2. Planned Toolchain
 

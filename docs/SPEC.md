@@ -580,6 +580,7 @@ The public error hierarchy must distinguish at least:
 - Storage consistency error.
 - Target metadata conflict error.
 - Synchronization locked error.
+- Synchronization failed after partial committed progress.
 - No valid RPC endpoint error.
 - RPC chain mismatch error.
 - RPC request failure with classified category.

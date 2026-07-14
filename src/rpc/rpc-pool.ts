@@ -49,6 +49,11 @@ export interface FetchLogsOptions {
   readonly signal?: AbortSignal;
 }
 
+export interface RpcRequestOptions {
+  readonly preferredEndpointIdentity?: string;
+  readonly signal?: AbortSignal;
+}
+
 export interface RpcPoolDependencies {
   readonly now?: () => number;
   readonly sleep?: (
@@ -127,13 +132,18 @@ export class RpcPool {
 
   public async getBlockHeader(
     blockNumber: bigint,
-    signal?: AbortSignal,
+    options: RpcRequestOptions = {},
   ): Promise<RpcBlockHeader> {
     const result = await this.#requestWithFailover(
       "eth_getBlockByNumber",
       [toHexQuantity(blockNumber), false],
       parseBlockHeader,
-      signal === undefined ? {} : { signal },
+      {
+        ...(options.preferredEndpointIdentity === undefined
+          ? {}
+          : { preferredEndpointIdentity: options.preferredEndpointIdentity }),
+        ...(options.signal === undefined ? {} : { signal: options.signal }),
+      },
     );
     return result.value;
   }
