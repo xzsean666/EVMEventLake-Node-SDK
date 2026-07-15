@@ -1,6 +1,6 @@
 # Next Session Handoff
 
-Last updated: 2026-07-14
+Last updated: 2026-07-15
 
 ## 1. Current Status
 
@@ -21,9 +21,11 @@ Adaptive synchronization, one-shot update orchestration, cancellation, lease
 renewal, reorg recovery, database-only query, versioned pagination, and the
 public client lifecycle are also implemented. Local HTTP end-to-end coverage,
 a gated Base USDC live-chain verification, a narrow public package surface, and
-clean exact-commit Git installation are complete. Remote GitHub installation
-cannot be tested before a push, and real PostgreSQL verification is unavailable
-in the current environment.
+clean exact-commit Git installation, a standalone consumer example, and the
+documented progress/logging stages are complete. Remote GitHub installation
+cannot be tested before a push. A PostgreSQL listener is reachable on local TCP
+port `5432`, but no credentials are available for the required real-server
+contract run.
 
 ## 2. Required Read Order
 
@@ -276,12 +278,34 @@ Release tags do not need committed `dist/`; it is built during Git installation.
 Remote GitHub reference verification remains impossible until push approval.
 No commit or tag has been pushed.
 
+### Phase 11 — Standalone consumer and distribution audit — completed locally
+
+Added `example/` as an independent pnpm consumer with a GitHub tag dependency,
+TypeScript package-root compilation, and a Node built-in test that exercises
+RPC failover/splitting, synchronization, decoded and unknown logs, filters,
+pagination, offline database queries, no-op updates, observability, and close.
+The repository install script now copies this maintained consumer to a temporary
+directory, injects the exact local or GitHub reference, verifies the resolved
+commit in its lockfile, and checks that the SDK worktree is unchanged.
+
+The audit also found that documented `range_fetch_started`, `range_split`, and
+endpoint progress stages were declared but not emitted. The synchronization
+path now emits those stages plus range commit, reorg, completion/no-op, and safe
+failure/cancellation log events.
+
+RPC validation was tightened at the same time: JSON-RPC version and request IDs
+must match, requested block headers must return the requested number, hashes and
+topics must have exact byte widths, log data must contain complete bytes,
+`removed` must be boolean, and numeric indexes must remain safe integers. URL
+redaction now removes non-root paths as well as credentials/query strings so
+provider keys embedded in paths cannot leak into errors or observability.
+
 ## 8. Immediate Next Action
 
-The code implementation is complete. Before publishing a release tag, run the
-shared storage suite against a real PostgreSQL server, obtain explicit approval
-to push, then rerun `test:git-install` against the pushed full commit SHA. Do not
-publish to npm.
+The code implementation is complete. Before publishing a release tag, obtain
+credentials for the reachable PostgreSQL server and run the shared storage suite
+against it, obtain explicit approval to push, then rerun
+`test:github-install` against the pushed full commit SHA. Do not publish to npm.
 
 ## 9. Risks and Unknowns
 
@@ -350,18 +374,34 @@ storage; the update caller receives the cancellation error.
 ### 9.12 Real PostgreSQL runtime
 
 Still pending as a release gate. The shared PostgreSQL-dialect suites pass
-through `pg-mem`, but `/var/run/postgresql:5432` has no active server, no local
-`postgres`/`pg_ctl` binary is available, and access to the Docker daemon socket
-is denied in this environment.
+through `pg-mem`. On 2026-07-15, `127.0.0.1:5432` accepted connections, but the
+available `postgres` role requires a password that is not present in the
+environment; the Unix socket is unavailable and Docker daemon access remains
+denied. Do not guess or brute-force database credentials.
+
+### 9.13 Public license
+
+Still pending before a public release. The repository has no `LICENSE` file and
+`package.json` has no `license` field. Do not invent a license on the user's
+behalf; obtain an explicit license choice, then keep the file and package
+metadata aligned.
 
 ## 10. Verification Already Performed
 
-- `pnpm run verify` passed with 61 tests passing and one gated live test skipped.
+- `pnpm run verify` passed with 63 tests passing and one gated live test skipped.
+- The explicitly enabled Base USDC live RPC test passed after strict JSON-RPC,
+  block-header, hash/topic, data, flag, and index validation was added.
 - The explicitly enabled Base USDC live RPC test passed.
 - `pnpm run test:integration` passed all local integration files.
 - `pnpm run test:git-install` passed from exact clean commit `89895f8`, including
   `prepare`, TypeScript declarations, public runtime imports, and SQLite native
   usage.
+- The expanded standalone consumer has been validated against the working SDK
+  through focused source/integration checks; rerun its exact Git install after
+  committing the current changes.
+- Runtime dependency audit through npm's current advisory endpoint reported
+  zero vulnerabilities. pnpm's legacy audit endpoint returned HTTP 410 and was
+  not used as evidence.
 - Required Step 1 and Step 2 documents exist in `docs/`.
 - Root `Agent.md` exists as the repository operating guide.
 - Official documentation links were reviewed on 2026-07-14; the newly added

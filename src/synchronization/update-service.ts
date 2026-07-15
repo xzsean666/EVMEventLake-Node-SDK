@@ -175,6 +175,18 @@ export class UpdateService {
           },
           stage: "reorg_rewind",
         });
+        emitLogSafely(this.#logger, {
+          event: "reorg_rewind",
+          level: "warn",
+          message:
+            "Recent chain history changed and stored events were rewound",
+          context: {
+            deletedLogs: rewind.deletedLogs,
+            nextBlock: rewind.nextBlock.toString(),
+            rewindFromBlock: rewind.rewindFromBlock.toString(),
+            targetKey: this.#target.targetKey,
+          },
+        });
       }
 
       await renewLease();
@@ -184,7 +196,7 @@ export class UpdateService {
         fromBlock > resolvedToBlock ||
         resolvedToBlock < this.#target.startBlock
       ) {
-        return this.#createResult({
+        const result = this.#createResult({
           committedRanges: 0,
           decodeFailedLogs: 0,
           decodedLogs: 0,
@@ -203,6 +215,8 @@ export class UpdateService {
           toBlock: resolvedToBlock,
           unknownLogs: 0,
         });
+        this.#emitUpdateCompleted(result);
+        return result;
       }
 
       const adaptiveFetcher = new AdaptiveLogFetcher({
@@ -211,6 +225,45 @@ export class UpdateService {
         maximumTimeoutSplitsPerRange:
           this.#rpcPolicy.maximumTimeoutSplitsPerRange,
         minimumBlockRange: this.#synchronizationPolicy.minimumBlockRange,
+        onRangeFetchStarted: (range) => {
+          const context = {
+            fromBlock: range.fromBlock.toString(),
+            targetKey: this.#target.targetKey,
+            toBlock: range.toBlock.toString(),
+          };
+          emitProgressSafely(this.#onProgress, {
+            context,
+            stage: "range_fetch_started",
+          });
+          emitLogSafely(this.#logger, {
+            event: "range_fetch_started",
+            level: "debug",
+            message: "Fetching an event log range",
+            context,
+          });
+        },
+        onRangeSplit: ({ children, range, reason }) => {
+          const context = {
+            childRanges: children.map((child) => ({
+              fromBlock: child.fromBlock.toString(),
+              toBlock: child.toBlock.toString(),
+            })),
+            fromBlock: range.fromBlock.toString(),
+            reason,
+            targetKey: this.#target.targetKey,
+            toBlock: range.toBlock.toString(),
+          };
+          emitProgressSafely(this.#onProgress, {
+            context,
+            stage: "range_split",
+          });
+          emitLogSafely(this.#logger, {
+            event: "range_split",
+            level: "warn",
+            message: "RPC event log range was split into smaller requests",
+            context,
+          });
+        },
         rpc: this.#rpc,
       });
       let committedRanges = 0;
@@ -221,6 +274,7 @@ export class UpdateService {
       let preferredRanges = 0;
       let storedLogs = 0;
       let unknownLogs = 0;
+      const reportedEndpointIdentities = new Set<string>();
 
       for (const preferredRange of iterateSynchronizationRanges(
         fromBlock,
@@ -232,6 +286,25 @@ export class UpdateService {
           preferredRange,
           options.signal,
         )) {
+          if (!reportedEndpointIdentities.has(fetchedRange.endpointIdentity)) {
+            reportedEndpointIdentities.add(fetchedRange.endpointIdentity);
+            const endpointContext = {
+              endpointIdentity: fetchedRange.endpointIdentity,
+              endpointUrl: fetchedRange.endpointUrl,
+              targetKey: this.#target.targetKey,
+            };
+            emitProgressSafely(this.#onProgress, {
+              context: endpointContext,
+              stage: "endpoint_validated",
+            });
+            emitLogSafely(this.#logger, {
+              event: "endpoint_validated",
+              level: "info",
+              message:
+                "RPC endpoint passed chain validation and served synchronization data",
+              context: endpointContext,
+            });
+          }
           await renewLease();
           const logs = normalizeLogs(
             fetchedRange.logs,
@@ -287,6 +360,17 @@ export class UpdateService {
             },
             stage: "range_committed",
           });
+          emitLogSafely(this.#logger, {
+            event: "range_committed",
+            level: "info",
+            message: "Event log range committed atomically",
+            context: {
+              fromBlock: fetchedRange.range.fromBlock.toString(),
+              insertedLogs: commit.insertedLogs,
+              targetKey: this.#target.targetKey,
+              toBlock: fetchedRange.range.toBlock.toString(),
+            },
+          });
         }
       }
 
@@ -310,13 +394,19 @@ export class UpdateService {
         toBlock: resolvedToBlock,
         unknownLogs,
       });
-      emitProgressSafely(this.#onProgress, {
-        context: { resultingNextBlock: result.resultingNextBlock.toString() },
-        stage: "update_completed",
-      });
+      this.#emitUpdateCompleted(result);
       return result;
     } catch (error) {
       if (error instanceof OperationCancelledError) {
+        emitLogSafely(this.#logger, {
+          event: "update_cancelled",
+          level: "warn",
+          message: "Event synchronization update was cancelled",
+          context: {
+            lastCommittedBlock: lastCommittedBlock?.toString() ?? null,
+            targetKey: this.#target.targetKey,
+          },
+        });
         throw new OperationCancelledError(
           "Synchronization update was cancelled",
           {
@@ -328,6 +418,17 @@ export class UpdateService {
           },
         );
       }
+      emitLogSafely(this.#logger, {
+        event: "update_failed",
+        level: "error",
+        message: "Event synchronization update failed",
+        context: {
+          errorName:
+            error instanceof Error ? error.name : "NonErrorThrownValue",
+          lastCommittedBlock: lastCommittedBlock?.toString() ?? null,
+          targetKey: this.#target.targetKey,
+        },
+      });
       if (lastCommittedBlock !== null) {
         throw new SynchronizationFailedError(
           "Synchronization stopped after committing partial progress",
@@ -392,6 +493,25 @@ export class UpdateService {
       );
     }
     return state;
+  }
+
+  #emitUpdateCompleted(result: UpdateResult): void {
+    const context = {
+      outcome: result.outcome,
+      resultingNextBlock: result.resultingNextBlock.toString(),
+      storedLogs: result.storedLogs,
+      targetKey: this.#target.targetKey,
+    };
+    emitProgressSafely(this.#onProgress, {
+      context,
+      stage: "update_completed",
+    });
+    emitLogSafely(this.#logger, {
+      event: "update_completed",
+      level: "info",
+      message: "Event synchronization update completed",
+      context,
+    });
   }
 
   #createResult(input: {

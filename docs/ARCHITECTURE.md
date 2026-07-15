@@ -211,6 +211,12 @@ Every behavior belongs to a named responsibility.
 │   ├── BUILD.md
 │   ├── EXTERNAL_DOCS.md
 │   └── nextsession.md
+├── example/
+│   ├── package.json
+│   ├── pnpm-workspace.yaml
+│   ├── typecheck.ts
+│   └── test/
+│       └── github-installed-sdk.test.mjs
 ├── src/
 │   ├── index.ts
 │   ├── client/
@@ -871,6 +877,13 @@ Step 4 was approved on 2026-07-14. Continue implementation in this order:
 11. Package build, examples, and release verification.
 
 Each phase must compile and pass its focused tests before the next phase begins.
+
+Phase 11 now includes a standalone `example/` consumer. It is deliberately
+outside the SDK workspace boundary, declares a GitHub tag dependency, and is
+copied into an operating-system temporary directory by the repository install
+test. The verification script replaces only the copied dependency reference,
+checks the resolved full commit in the consumer lockfile, and verifies that the
+SDK worktree is unchanged.
 
 ## 15. Architecture Invariants
 

@@ -106,4 +106,46 @@ describe("HttpEvmRpcClient", () => {
       }),
     ).rejects.toBeInstanceOf(RpcRequestFailure);
   });
+
+  it("rejects mismatched JSON-RPC versions and request IDs", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({ id: 2, jsonrpc: "2.0", result: "0x1" }),
+            { status: 200 },
+          ),
+        ),
+      ),
+    );
+    await expect(
+      new HttpEvmRpcClient().request({
+        endpointUrl: "https://rpc.example",
+        method: "eth_chainId",
+        params: [],
+        requestTimeoutMs: 1_000,
+      }),
+    ).rejects.toMatchObject({ category: "invalid_response" });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({ id: 1, jsonrpc: "1.0", result: "0x1" }),
+            { status: 200 },
+          ),
+        ),
+      ),
+    );
+    await expect(
+      new HttpEvmRpcClient().request({
+        endpointUrl: "https://rpc.example",
+        method: "eth_chainId",
+        params: [],
+        requestTimeoutMs: 1_000,
+      }),
+    ).rejects.toMatchObject({ category: "invalid_response" });
+  });
 });

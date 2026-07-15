@@ -137,7 +137,7 @@ export class RpcPool {
     const result = await this.#requestWithFailover(
       "eth_getBlockByNumber",
       [toHexQuantity(blockNumber), false],
-      parseBlockHeader,
+      (value) => parseBlockHeader(value, blockNumber),
       {
         ...(options.preferredEndpointIdentity === undefined
           ? {}
@@ -363,12 +363,19 @@ export function parseHexQuantity(value: unknown): bigint {
   return BigInt(value);
 }
 
-function parseBlockHeader(value: unknown): RpcBlockHeader {
+function parseBlockHeader(
+  value: unknown,
+  expectedBlockNumber: bigint,
+): RpcBlockHeader {
   const record = assertRecord(value, "block header");
+  const number = parseHexQuantity(record.number);
+  if (number !== expectedBlockNumber) {
+    throw new TypeError("RPC block header number does not match the request");
+  }
   return Object.freeze({
-    hash: assertHex(record.hash, "block hash"),
-    number: parseHexQuantity(record.number),
-    parentHash: assertHex(record.parentHash, "parent block hash"),
+    hash: assertHexBytes(record.hash, "block hash", 32),
+    number,
+    parentHash: assertHexBytes(record.parentHash, "parent block hash", 32),
   });
 }
 
@@ -381,22 +388,32 @@ function parseRpcLogs(value: unknown): readonly RpcLog[] {
       if (!Array.isArray(log.topics)) {
         throw new TypeError("RPC log topics must be an array");
       }
-      const address = assertHex(log.address, "log address");
+      const address = assertHexBytes(log.address, "log address", 20);
       if (!isAddress(address, { strict: false })) {
         throw new TypeError("RPC log address must be a 20-byte EVM address");
       }
+      if (typeof log.removed !== "boolean") {
+        throw new TypeError("RPC log removed flag must be boolean");
+      }
       return Object.freeze({
         address,
-        blockHash: assertHex(log.blockHash, "log block hash"),
+        blockHash: assertHexBytes(log.blockHash, "log block hash", 32),
         blockNumber: parseHexQuantity(log.blockNumber),
-        data: assertHex(log.data, "log data"),
-        logIndex: Number(parseHexQuantity(log.logIndex)),
-        removed: log.removed === true,
+        data: assertHexData(log.data, "log data"),
+        logIndex: parseRpcIndex(log.logIndex, "log index"),
+        removed: log.removed,
         topics: Object.freeze(
-          log.topics.map((topic) => assertHex(topic, "log topic")),
+          log.topics.map((topic) => assertHexBytes(topic, "log topic", 32)),
         ),
-        transactionHash: assertHex(log.transactionHash, "transaction hash"),
-        transactionIndex: Number(parseHexQuantity(log.transactionIndex)),
+        transactionHash: assertHexBytes(
+          log.transactionHash,
+          "transaction hash",
+          32,
+        ),
+        transactionIndex: parseRpcIndex(
+          log.transactionIndex,
+          "transaction index",
+        ),
       });
     }),
   );
@@ -409,11 +426,34 @@ function assertRecord(value: unknown, label: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function assertHex(value: unknown, label: string): Hex {
-  if (typeof value !== "string" || !/^0x[0-9a-f]*$/i.test(value)) {
-    throw new TypeError(`RPC ${label} must be hexadecimal`);
+function assertHexBytes(
+  value: unknown,
+  label: string,
+  byteLength: number,
+): Hex {
+  if (
+    typeof value !== "string" ||
+    !/^0x[0-9a-f]+$/i.test(value) ||
+    value.length !== 2 + byteLength * 2
+  ) {
+    throw new TypeError(`RPC ${label} must be ${byteLength} hexadecimal bytes`);
   }
   return value.toLowerCase() as Hex;
+}
+
+function assertHexData(value: unknown, label: string): Hex {
+  if (typeof value !== "string" || !/^0x(?:[0-9a-f]{2})*$/i.test(value)) {
+    throw new TypeError(`RPC ${label} must contain complete hexadecimal bytes`);
+  }
+  return value.toLowerCase() as Hex;
+}
+
+function parseRpcIndex(value: unknown, label: string): number {
+  const parsed = parseHexQuantity(value);
+  if (parsed > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new TypeError(`RPC ${label} exceeds the safe integer range`);
+  }
+  return Number(parsed);
 }
 
 async function sleepWithCancellation(

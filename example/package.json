@@ -1,0 +1,25 @@
+{
+  "name": "evm-event-lake-github-consumer-example",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Standalone consumer verification for the GitHub-installed EVMEventLake Node SDK",
+  "type": "module",
+  "packageManager": "pnpm@10.12.1",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "verify": "pnpm run typecheck && pnpm run test"
+  },
+  "dependencies": {
+    "@evm-event-lake/node-sdk": "github:xzsean666/EVMEventLake-Node-SDK#v0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "typescript": "5.9.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3"
+    ]
+  }
+}

@@ -121,12 +121,56 @@ describe("RpcPool", () => {
       1n,
       1n,
     );
-    expect(result.endpointUrl).toBe("https://rpc.example/path");
+    expect(result.endpointUrl).toBe("https://rpc.example/redacted");
     expect(result.endpointIdentity).toMatch(/^[0-9a-f]{64}$/);
     pool.cooldownEndpoint(result.endpointIdentity);
     await expect(pool.getBlockNumber()).rejects.toBeInstanceOf(
       NoValidRpcEndpointError,
     );
+  });
+
+  it("rejects mismatched block headers and malformed log fields", async () => {
+    const headerPool = createPool(
+      ["https://rpc.example"],
+      new FakeRpcTransport((request) => {
+        if (request.method === "eth_chainId") return "0x1";
+        return {
+          hash: `0x${"11".repeat(32)}`,
+          number: "0x63",
+          parentHash: `0x${"22".repeat(32)}`,
+        };
+      }),
+    );
+    await expect(headerPool.getBlockHeader(100n)).rejects.toMatchObject({
+      code: "RPC_REQUEST_EXHAUSTED",
+    });
+
+    const logPool = createPool(
+      ["https://rpc.example"],
+      new FakeRpcTransport((request) => {
+        if (request.method === "eth_chainId") return "0x1";
+        return [
+          {
+            address: "0x0000000000000000000000000000000000000001",
+            blockHash: `0x${"11".repeat(32)}`,
+            blockNumber: "0x64",
+            data: "0x0",
+            logIndex: "0x0",
+            removed: "false",
+            topics: ["0x1"],
+            transactionHash: `0x${"22".repeat(32)}`,
+            transactionIndex: "0x0",
+          },
+        ];
+      }),
+    );
+    await expect(
+      logPool.fetchLogs(
+        "0x0000000000000000000000000000000000000001",
+        100n,
+        100n,
+      ),
+    ).rejects.toMatchObject({ code: "RPC_REQUEST_EXHAUSTED" });
   });
 });
 

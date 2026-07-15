@@ -37,6 +37,12 @@ export interface AdaptiveLogFetcherMetrics {
   readonly rangeSplits: number;
 }
 
+export interface AdaptiveLogRangeSplitEvent {
+  readonly children: readonly [SynchronizationRange, SynchronizationRange];
+  readonly range: SynchronizationRange;
+  readonly reason: "range_limit" | "timeout";
+}
+
 interface PendingRange {
   readonly preferredEndpointIdentity?: string;
   readonly range: SynchronizationRange;
@@ -48,6 +54,10 @@ export class AdaptiveLogFetcher {
   readonly #contractAddress: Address;
   readonly #maximumTimeoutSplitsPerRange: number;
   readonly #minimumBlockRange: number;
+  readonly #onRangeFetchStarted:
+    ((range: SynchronizationRange) => void) | undefined;
+  readonly #onRangeSplit:
+    ((event: AdaptiveLogRangeSplitEvent) => void) | undefined;
   readonly #rpc: AdaptiveLogRpcClient;
   #rangeSplits = 0;
 
@@ -56,12 +66,16 @@ export class AdaptiveLogFetcher {
     readonly beforeRequest?: () => Promise<void>;
     readonly maximumTimeoutSplitsPerRange: number;
     readonly minimumBlockRange: number;
+    readonly onRangeFetchStarted?: (range: SynchronizationRange) => void;
+    readonly onRangeSplit?: (event: AdaptiveLogRangeSplitEvent) => void;
     readonly rpc: AdaptiveLogRpcClient;
   }) {
     this.#beforeRequest = input.beforeRequest;
     this.#contractAddress = input.contractAddress;
     this.#maximumTimeoutSplitsPerRange = input.maximumTimeoutSplitsPerRange;
     this.#minimumBlockRange = input.minimumBlockRange;
+    this.#onRangeFetchStarted = input.onRangeFetchStarted;
+    this.#onRangeSplit = input.onRangeSplit;
     this.#rpc = input.rpc;
   }
 
@@ -81,6 +95,7 @@ export class AdaptiveLogFetcher {
       const pendingRange = pendingRanges.shift();
       if (pendingRange === undefined) break;
       try {
+        this.#onRangeFetchStarted?.(pendingRange.range);
         await this.#beforeRequest?.();
         const result = await this.#rpc.fetchLogs(
           this.#contractAddress,
@@ -111,6 +126,13 @@ export class AdaptiveLogFetcher {
             );
             if (split !== null) {
               this.#rangeSplits += 1;
+              this.#onRangeSplit?.(
+                Object.freeze({
+                  children: split,
+                  range: pendingRange.range,
+                  reason: "range_limit",
+                }),
+              );
               pendingRanges.unshift(
                 createPendingRange(
                   split[0],
@@ -142,6 +164,13 @@ export class AdaptiveLogFetcher {
               pendingRange.timeoutSplits < this.#maximumTimeoutSplitsPerRange
             ) {
               this.#rangeSplits += 1;
+              this.#onRangeSplit?.(
+                Object.freeze({
+                  children: split,
+                  range: pendingRange.range,
+                  reason: "timeout",
+                }),
+              );
               const timeoutSplits = pendingRange.timeoutSplits + 1;
               pendingRanges.unshift(
                 createPendingRange(

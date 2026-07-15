@@ -13,8 +13,9 @@ lossless value codec, SQLite/PostgreSQL storage adapters, HTTP JSON-RPC
 transport/pool, adaptive synchronization, checkpoint/reorg recovery, lockfile,
 database-only query/cursor pagination, the public `EVMEventLake` client, local
 HTTP end-to-end tests, gated live RPC verification, a narrow package-root API,
-and clean Git dependency installation are implemented. Remote GitHub-reference
-verification and real PostgreSQL verification remain release gates.
+clean Git dependency installation, and a standalone GitHub consumer example are
+implemented. Remote GitHub-reference verification and credentialed real
+PostgreSQL verification remain release gates.
 
 ## 2. Toolchain
 
@@ -86,14 +87,19 @@ project. A local workspace link is not sufficient release evidence.
 
 `pnpm run test:git-install` automates this contract. By default it refuses a
 dirty repository, installs the exact local `HEAD` through a `git+file` reference,
-compiles TypeScript imports from the package root, and runs a SQLite lifecycle
-smoke test. After a commit has been pushed, the same consumer check can target a
-remote reference:
+copies the maintained standalone consumer into an operating-system temporary
+directory, compiles TypeScript imports from the package root, and runs its full
+SQLite/RPC/query lifecycle suite. It checks the resolved commit in the consumer
+lockfile and confirms that the SDK worktree was not changed. After a commit has
+been pushed, the same consumer check can require a remote GitHub reference:
 
 ```bash
 EVM_EVENT_LAKE_GIT_INSTALL_SPEC=github:xzsean666/EVMEventLake-Node-SDK#<full-commit-sha> \
-pnpm run test:git-install
+pnpm run test:github-install
 ```
+
+Mutable branch references such as `main` are rejected. Accepted references are
+semantic version tags and full 40-character commit SHAs.
 
 ## 4. Local Development Setup
 
@@ -394,6 +400,7 @@ pnpm run test:storage:sqlite
 pnpm run test:storage:postgresql
 pnpm run test:integration
 pnpm run test:git-install
+pnpm run test:github-install
 ```
 
 The PostgreSQL storage contract currently runs through `pg-mem` using Kysely's
@@ -424,7 +431,36 @@ automatic endpoint failover, adaptive `eth_getLogs` range splitting, ABI
 decoding, SQLite persistence/query, and `close()` cancellation of an active
 update.
 
-## 13. Git Installation Verification
+## 13. Standalone Consumer Example
+
+`example/` is a separate pnpm project and is not a member of the SDK workspace.
+It never imports `../src`, `../dist`, or a workspace link. Its declared SDK
+dependency is the GitHub `v0.1.0` tag, and its own `pnpm-workspace.yaml` prevents
+pnpm from walking up to the SDK repository boundary.
+
+The example verifies:
+
+- Package-root runtime and TypeScript imports.
+- SQLite creation, status, update, query, and close calls.
+- RPC chain validation, endpoint failover, and adaptive range splitting.
+- Decoded events and preserved unknown raw logs.
+- Signature, indexed value, transaction, block range, and cursor queries.
+- Database-only reads after the RPC fixture is stopped.
+- No-op update and observability callback behavior.
+
+Run the example directly after the referenced tag exists:
+
+```bash
+cd example
+pnpm install --frozen-lockfile=false
+pnpm run verify
+```
+
+For release automation, prefer `pnpm run test:github-install` from the repository
+root. It uses a temporary copy, so neither root dependencies nor the maintained
+example files are modified.
+
+## 14. Git Installation Verification
 
 Verified locally on 2026-07-14 with a clean exact Git commit:
 
@@ -438,8 +474,9 @@ Verified locally on 2026-07-14 with a clean exact Git commit:
 - The consumer lockfile recorded the expected Git commit rather than an npm
   registry resolution.
 
-The GitHub-hosted form cannot be verified until the commits are pushed. Pushing
-or creating a remote tag still requires explicit user approval.
+The GitHub-hosted form cannot be verified until the commits are pushed. The
+current remote has no branch or tag reference. Pushing or creating a remote tag
+still requires explicit user approval.
 
 For each release candidate:
 
@@ -455,7 +492,7 @@ For each release candidate:
 
 Do not push commits or tags unless the user explicitly requests it.
 
-## 14. Troubleshooting Contract
+## 15. Troubleshooting Contract
 
 ### Git install succeeds but import fails
 
@@ -498,10 +535,11 @@ cursor falsely.
 Queries never trigger synchronization. The caller must explicitly run
 `update`, inspect its result, and then query the committed range.
 
-## 15. Release Checklist
+## 16. Release Checklist
 
 Before describing a Git tag as installable:
 
+- An explicit repository/package license has been selected and committed.
 - Local formatting, lint, typecheck, tests, and build pass.
 - SQLite and PostgreSQL storage contract tests pass.
 - Git install from the exact reference passes in a clean consumer.

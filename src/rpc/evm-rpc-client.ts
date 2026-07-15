@@ -21,6 +21,8 @@ interface JsonRpcResponse {
     readonly code?: unknown;
     readonly message?: unknown;
   };
+  readonly id?: unknown;
+  readonly jsonrpc?: unknown;
   readonly result?: unknown;
 }
 
@@ -45,9 +47,10 @@ export class HttpEvmRpcClient implements RpcTransport {
 
     try {
       this.#requestId += 1;
+      const requestId = this.#requestId;
       const response = await fetch(request.endpointUrl, {
         body: JSON.stringify({
-          id: this.#requestId,
+          id: requestId,
           jsonrpc: "2.0",
           method: request.method,
           params: request.params,
@@ -88,7 +91,11 @@ export class HttpEvmRpcClient implements RpcTransport {
           method: request.method,
         });
       }
-      if (payload === null || typeof payload !== "object") {
+      if (
+        payload === null ||
+        typeof payload !== "object" ||
+        Array.isArray(payload)
+      ) {
         throw new RpcRequestFailure("RPC response has an invalid shape", {
           category: "invalid_response",
           endpointUrl: request.endpointUrl,
@@ -97,6 +104,16 @@ export class HttpEvmRpcClient implements RpcTransport {
       }
 
       const rpcResponse = payload as JsonRpcResponse;
+      if (rpcResponse.jsonrpc !== "2.0" || rpcResponse.id !== requestId) {
+        throw new RpcRequestFailure(
+          "RPC response version or request ID does not match",
+          {
+            category: "invalid_response",
+            endpointUrl: request.endpointUrl,
+            method: request.method,
+          },
+        );
+      }
       if (rpcResponse.error !== undefined) {
         const message =
           typeof rpcResponse.error.message === "string"

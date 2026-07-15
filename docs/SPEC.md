@@ -612,6 +612,11 @@ Optional structured events should cover:
 Events must not include database passwords, full credential-bearing URLs, or
 raw secrets.
 
+The implemented progress callback emits update start/completion, range fetch
+start, adaptive range split, successful endpoint use, range commit, and reorg
+rewind stages. Structured logger events additionally report update cancellation
+and failure. A no-op update still emits update completion.
+
 ## 17. Performance and Safety Requirements
 
 - Log inserts are batched per committed range.
@@ -657,10 +662,12 @@ Implementation is acceptable only when all of these are demonstrated:
 The deterministic local suite demonstrated criteria 4 through 20 where they do
 not require a real PostgreSQL server. The gated live test demonstrated criterion
 19 against Base USDC block `48625053` on 2026-07-14. A clean local Git dependency
-consumer demonstrated criterion 2 and the installation lifecycle portion of
-criterion 1. The GitHub-hosted reference remains untestable until push approval,
-and criterion 3 still requires a real PostgreSQL server in addition to the
-passing shared `pg-mem` contract suite.
+consumer and the maintained standalone `example/` demonstrated criterion 2 and
+the installation lifecycle portion of criterion 1. The example uses only the
+public package root and is executed outside the SDK worktree. The GitHub-hosted
+reference remains untestable until push approval, and criterion 3 still requires
+a credentialed real PostgreSQL server in addition to the passing shared `pg-mem`
+contract suite.
 
 ## 19. Caller-Owned Usage Patterns
 

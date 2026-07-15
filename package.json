@@ -39,8 +39,8 @@
     "prebuild": "pnpm run clean",
     "build": "tsc -p tsconfig.build.json",
     "prepare": "tsc -p tsconfig.build.json",
-    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\" \"scripts/**/*.mjs\" \"*.{json,js}\"",
-    "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\" \"scripts/**/*.mjs\" \"*.{json,js}\"",
+    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\" \"scripts/**/*.mjs\" \"example/**/*.{json,md,mjs,ts,yaml}\" \"*.{json,js}\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\" \"scripts/**/*.mjs\" \"example/**/*.{json,md,mjs,ts,yaml}\" \"*.{json,js}\"",
     "lint": "eslint src tests eslint.config.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
@@ -50,6 +50,7 @@
     "test:integration": "vitest run tests/integration",
     "test:live-rpc": "vitest run tests/live-rpc",
     "test:git-install": "node scripts/test-git-install.mjs",
+    "test:github-install": "node scripts/test-git-install.mjs --github",
     "verify": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build"
   },
   "dependencies": {

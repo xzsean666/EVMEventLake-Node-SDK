@@ -58,10 +58,14 @@ describe("AdaptiveLogFetcher", () => {
       }
       return { endpointIdentity, endpointUrl, logs: [] };
     });
+    const startedRanges: { fromBlock: bigint; toBlock: bigint }[] = [];
+    const splitReasons: string[] = [];
     const fetcher = new AdaptiveLogFetcher({
       contractAddress,
       maximumTimeoutSplitsPerRange: 2,
       minimumBlockRange: 1,
+      onRangeFetchStarted: (range) => startedRanges.push(range),
+      onRangeSplit: (event) => splitReasons.push(event.reason),
       rpc,
     });
 
@@ -73,6 +77,12 @@ describe("AdaptiveLogFetcher", () => {
       { fromBlock: 1n, toBlock: 2n },
       { fromBlock: 3n, toBlock: 4n },
     ]);
+    expect(startedRanges).toEqual([
+      { fromBlock: 1n, toBlock: 4n },
+      { fromBlock: 1n, toBlock: 2n },
+      { fromBlock: 3n, toBlock: 4n },
+    ]);
+    expect(splitReasons).toEqual(["range_limit"]);
     expect(fetcher.getMetrics().rangeSplits).toBe(1);
   });
 

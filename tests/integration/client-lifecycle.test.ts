@@ -31,11 +31,15 @@ describe("EVMEventLake client lifecycle", () => {
   it("creates and queries local state without requiring RPC connectivity", async () => {
     const directory = await mkdtemp(join(tmpdir(), "eventlake-client-"));
     directories.push(directory);
+    const progressStages: string[] = [];
     const client = await EVMEventLake.create({
       abi,
       chainId: 1,
       contractAddress: "0x0000000000000000000000000000000000000010",
       database: `sqlite://${join(directory, "events.db")}`,
+      observability: {
+        onProgress: (event) => progressStages.push(event.stage),
+      },
       rpcUrls: ["https://unreachable.invalid"],
       startBlock: 100n,
     });
@@ -43,6 +47,7 @@ describe("EVMEventLake client lifecycle", () => {
     expect((await client.getSyncStatus()).nextBlock).toBe(100n);
     expect((await client.events.findMany()).items).toEqual([]);
     expect((await client.update({ toBlock: 99n })).outcome).toBe("no_op");
+    expect(progressStages).toContain("update_completed");
     await client.close();
     await client.close();
     expect(() => client.events.findMany()).toThrow(ClientClosedError);

@@ -336,6 +336,9 @@ export function redactUrl(rawUrl: string): string {
     const parsedUrl = new URL(rawUrl);
     parsedUrl.username = "";
     parsedUrl.password = "";
+    if (parsedUrl.pathname !== "/" && parsedUrl.pathname !== "") {
+      parsedUrl.pathname = "/redacted";
+    }
     parsedUrl.search = "";
     parsedUrl.hash = "";
     return parsedUrl.toString();

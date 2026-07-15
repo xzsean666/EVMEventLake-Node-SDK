@@ -44,7 +44,7 @@ describe("classifyRpcFailure", () => {
       method: "eth_blockNumber",
     });
 
-    expect(error.endpointUrl).toBe("https://rpc.example/path");
+    expect(error.endpointUrl).toBe("https://rpc.example/redacted");
     expect(JSON.stringify(error.context)).not.toContain("secret");
   });
 });

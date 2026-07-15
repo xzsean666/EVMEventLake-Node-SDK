@@ -56,7 +56,7 @@ describe("validateSdkOptions", () => {
       redactUrl(
         "postgresql://eventlake:secret@localhost:5432/eventlake?sslmode=require",
       ),
-    ).toBe("postgresql://localhost:5432/eventlake");
+    ).toBe("postgresql://localhost:5432/redacted");
   });
 
   it("rejects unsupported database schemes", () => {

@@ -46,11 +46,17 @@ describe("public client HTTP end-to-end", () => {
     const baseUrl = await listen(server);
     const directory = await mkdtemp(join(tmpdir(), "eventlake-http-e2e-"));
     directories.push(directory);
+    const logEvents: string[] = [];
+    const progressStages: string[] = [];
     const client = await EVMEventLake.create({
       abi: transferAbi,
       chainId: 1,
       contractAddress,
       database: `sqlite://${join(directory, "events.db")}`,
+      observability: {
+        logger: { log: (event) => logEvents.push(event.event) },
+        onProgress: (event) => progressStages.push(event.stage),
+      },
       rpc: { maxRetriesPerEndpoint: 0, requestTimeoutMs: 2_000 },
       rpcUrls: [`${baseUrl}/bad`, `${baseUrl}/rpc`],
       startBlock: 100n,
@@ -63,6 +69,23 @@ describe("public client HTTP end-to-end", () => {
       expect(result.rangeSplits).toBe(1);
       expect(result.endpointFailovers).toBeGreaterThanOrEqual(1);
       expect(result.storedLogs).toBe(1);
+      expect(logEvents).toEqual(
+        expect.arrayContaining([
+          "endpoint_validated",
+          "range_committed",
+          "range_split",
+          "update_completed",
+        ]),
+      );
+      expect(progressStages).toEqual(
+        expect.arrayContaining([
+          "endpoint_validated",
+          "range_fetch_started",
+          "range_split",
+          "range_committed",
+          "update_completed",
+        ]),
+      );
 
       const page = await client.events.findMany({
         where: {

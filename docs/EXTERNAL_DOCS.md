@@ -1,6 +1,6 @@
 # External and Related Project Documentation
 
-Last reviewed: 2026-07-14
+Last reviewed: 2026-07-15
 
 ## 1. Purpose
 
@@ -181,11 +181,14 @@ by this repository and tested against both databases.
 - Development verification: Node.js `24.2.0`.
 
 - Official docs: <https://nodejs.org/docs/latest/api/>
+- Built-in test runner: <https://nodejs.org/docs/latest/api/test.html>
 - Release/LTS status: <https://nodejs.org/en/about/previous-releases>
 - Relationship: Required runtime.
 - SDK areas: Entire package and release compatibility.
-- Why used: Runtime for the SDK and consumer applications.
-- Verified: 2026-07-14.
+- Why used: Runtime for the SDK and consumer applications. The standalone
+  `example/` consumer uses the built-in test runner so it does not need a second
+  runtime test framework.
+- Verified: 2026-07-15.
 
 Check the LTS table again before changing the Node.js 22 minimum in a future
 release.

@@ -93,9 +93,7 @@ if (status.syncedThroughBlock !== null) {
   const count = 100n;
   const calculatedStart = status.syncedThroughBlock - count + 1n;
   const fromBlock =
-    calculatedStart > status.startBlock
-      ? calculatedStart
-      : status.startBlock;
+    calculatedStart > status.startBlock ? calculatedStart : status.startBlock;
 
   const recentEvents = await eventLake.events.findMany({
     where: {
@@ -134,3 +132,9 @@ pnpm run test:git-install
 ```
 
 Live RPC tests are opt-in; see `docs/BUILD.md` for the fixed Base USDC sample.
+
+[`example/`](example/README.md) is a standalone consumer project with its own
+pnpm boundary. It installs the SDK from GitHub and exercises the public
+TypeScript/runtime API, local RPC failover and range splitting, SQLite
+persistence, queries, pagination, offline reads, observability, and lifecycle
+behavior without importing this repository's source or workspace packages.
