@@ -171,7 +171,9 @@ by this repository and tested against both databases.
 - SDK area: `storage/postgresql`.
 - Why used: Shared and concurrent durable database for larger or multi-process
   applications.
-- Verified: 2026-07-14.
+- Real release verification: PostgreSQL `18.4` on 2026-07-15; the shared storage
+  and query contracts passed in isolated temporary schemas.
+- Verified: 2026-07-15.
 
 ## 6. Node, TypeScript, and Git Package Installation
 

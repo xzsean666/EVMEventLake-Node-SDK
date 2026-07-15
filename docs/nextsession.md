@@ -10,7 +10,7 @@ Steps 1 through 3 of the repository workflow are complete and Step 4 is active:
 - Step 2: Product, build, external documentation, and agent rules completed and
   committed.
 - Step 3: This context handoff completed.
-- Step 4: Approved on 2026-07-14; Phases 1 through 10 completed locally.
+- Step 4: Approved on 2026-07-14; Phases 1 through 11 completed and verified.
 
 The repository now contains an ESM package foundation, pinned dependencies,
 strict TypeScript and ESLint configuration, public errors, observability
@@ -22,10 +22,10 @@ renewal, reorg recovery, database-only query, versioned pagination, and the
 public client lifecycle are also implemented. Local HTTP end-to-end coverage,
 a gated Base USDC live-chain verification, a narrow public package surface, and
 clean exact-commit Git installation, a standalone consumer example, and the
-documented progress/logging stages are complete. Remote GitHub installation
-cannot be tested before a push. A PostgreSQL listener is reachable on local TCP
-port `5432`, but no credentials are available for the required real-server
-contract run.
+documented progress/logging stages are complete. The pushed GitHub full
+commit was installed successfully by the standalone consumer. The shared
+storage and query contracts also passed against PostgreSQL 18.4 using isolated
+temporary schemas.
 
 ## 2. Required Read Order
 
@@ -220,12 +220,12 @@ Implemented schema migration, target and ABI registration, fixed-width portable
 block keys, logs and indexed parameters, checkpoints, target-scoped leases,
 atomic range commits, rewind, query primitives, WAL mode, and contract tests.
 
-### Phase 4 — PostgreSQL — completed with release verification pending
+### Phase 4 — PostgreSQL — completed and verified on a real server
 
 Implemented the standard `pg.Pool` adapter and ran the same six storage contract
-tests through `pg-mem`. SQLite and PostgreSQL-dialect suites both pass. A real
-PostgreSQL server test is still required before a release tag because Docker and
-the local server are unavailable in the current environment.
+tests through `pg-mem`. SQLite and PostgreSQL-dialect suites both pass. On
+2026-07-15, the six storage contracts and three query contracts also passed
+against PostgreSQL 18.4. Each test created and dropped its own unique schema.
 
 ### Phase 5 — RPC pool — completed
 
@@ -266,7 +266,7 @@ environment-gated real RPC test using Base mainnet (`8453`), USDC
 The sample returned 76 contract logs and 57 decoded Transfer events on
 2026-07-14.
 
-### Phase 10 — GitHub installation and release readiness — completed locally
+### Phase 10 — GitHub installation and release readiness — completed remotely
 
 Added the root README, repository metadata, a narrow public package surface,
 public sync/query/update types, and `scripts/test-git-install.mjs`. A clean
@@ -275,10 +275,11 @@ package `prepare` lifecycle, compiled package-root TypeScript imports, and ran a
 SQLite create/query/close smoke test. `better-sqlite3` installed successfully.
 Release tags do not need committed `dist/`; it is built during Git installation.
 
-Remote GitHub reference verification remains impossible until push approval.
-No commit or tag has been pushed.
+GitHub full-commit verification passed for pushed commit
+`7eb95d90bae26f229329fcc0c483dcce43fad08a`. No semantic version tag has been
+created.
 
-### Phase 11 — Standalone consumer and distribution audit — completed locally
+### Phase 11 — Standalone consumer and distribution audit — completed locally and remotely
 
 Added `example/` as an independent pnpm consumer with a GitHub tag dependency,
 TypeScript package-root compilation, and a Node built-in test that exercises
@@ -302,10 +303,11 @@ provider keys embedded in paths cannot leak into errors or observability.
 
 ## 8. Immediate Next Action
 
-The code implementation is complete. Before publishing a release tag, obtain
-credentials for the reachable PostgreSQL server and run the shared storage suite
-against it, obtain explicit approval to push, then rerun
-`test:github-install` against the pushed full commit SHA. Do not publish to npm.
+The code and release verification are complete for an immutable GitHub commit.
+Before publishing a semantic release tag, obtain an explicit license decision,
+commit the matching `LICENSE` and package metadata, rerun the final GitHub
+consumer against that pushed commit, and obtain explicit approval for tag
+creation. Do not publish to npm.
 
 ## 9. Risks and Unknowns
 
@@ -315,10 +317,10 @@ Resolved: the package is ESM-only and requires Node.js 22 or newer.
 
 ### 9.2 Git install preparation lifecycle
 
-Resolved locally: pnpm installed an exact clean Git commit, installed build
-dependencies, ran `prepare`, generated runtime/declaration output, and passed
-consumer type/runtime/SQLite checks. `dist/` remains uncommitted. The same test
-must be rerun with a GitHub-hosted SHA after push approval.
+Resolved locally and remotely: pnpm installed exact clean Git commits, installed
+build dependencies, ran `prepare`, generated runtime/declaration output, and
+passed consumer type/runtime/SQLite checks. The GitHub-hosted verification used
+full commit `7eb95d90bae26f229329fcc0c483dcce43fad08a`. `dist/` remains uncommitted.
 
 ### 9.3 Native SQLite dependency
 
@@ -374,11 +376,12 @@ storage; the update caller receives the cancellation error.
 
 ### 9.12 Real PostgreSQL runtime
 
-Still pending as a release gate. The shared PostgreSQL-dialect suites pass
-through `pg-mem`. On 2026-07-15, `127.0.0.1:5432` accepted connections, but the
-available `postgres` role requires a password that is not present in the
-environment; the Unix socket is unavailable and Docker daemon access remains
-denied. Do not guess or brute-force database credentials.
+Resolved: PostgreSQL 18.4 accepted the provided credentialed connection, and the
+six shared storage contracts plus three shared query contracts passed. The
+gated test created a unique schema for every case and dropped each schema with
+`CASCADE`; a post-test inspection found zero matching schemas. The connection
+URL is supplied only through `EVM_EVENT_LAKE_POSTGRESQL_TEST_URL` and is not
+stored in the repository.
 
 ### 9.13 Public license
 
@@ -389,7 +392,7 @@ metadata aligned.
 
 ## 10. Verification Already Performed
 
-- `pnpm run verify` passed with 63 tests passing and one gated live test skipped.
+- `pnpm run verify` passed with 63 tests passing and two gated tests skipped.
 - The explicitly enabled Base USDC live RPC test passed after strict JSON-RPC,
   block-header, hash/topic, data, flag, and index validation was added.
 - `pnpm run test:integration` passed all local integration files.
@@ -399,6 +402,10 @@ metadata aligned.
   reads, observability, and lifecycle checks.
 - The same exact Git consumer passed under Node.js `22.23.1`, including a fresh
   `better-sqlite3` installation for that runtime.
+- `pnpm run test:github-install` passed using GitHub-hosted full commit
+  `7eb95d90bae26f229329fcc0c483dcce43fad08a`.
+- `pnpm run test:storage:postgresql:real` passed all nine storage/query contracts
+  against PostgreSQL 18.4, and cleanup left zero temporary schemas.
 - Runtime dependency audit through npm's current advisory endpoint reported
   zero vulnerabilities. pnpm's legacy audit endpoint returned HTTP 410 and was
   not used as evidence.
@@ -407,7 +414,7 @@ metadata aligned.
 - Official documentation links were reviewed on 2026-07-14 and 2026-07-15; the
   newly added Base, Circle, and Node test-runner documentation links were used.
 - Phases 1 through 11 were committed incrementally.
-- No commit was pushed.
+- `main` was pushed through commit `7eb95d9`; no semantic version tag exists.
 
 ## 11. Do Not Do Next
 

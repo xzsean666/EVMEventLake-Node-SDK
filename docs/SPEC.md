@@ -661,13 +661,12 @@ Implementation is acceptable only when all of these are demonstrated:
 
 The deterministic local suite demonstrated criteria 4 through 20 where they do
 not require a real PostgreSQL server. The gated live test demonstrated criterion
-19 against Base USDC block `48625053` on 2026-07-14. A clean local Git dependency
-consumer and the maintained standalone `example/` demonstrated criterion 2 and
-the installation lifecycle portion of criterion 1. The example uses only the
-public package root and is executed outside the SDK worktree. The GitHub-hosted
-reference remains untestable until push approval, and criterion 3 still requires
-a credentialed real PostgreSQL server in addition to the passing shared `pg-mem`
-contract suite.
+19 against Base USDC block `48625053` on 2026-07-14. A clean GitHub full-commit
+consumer and the maintained standalone `example/` demonstrated criteria 1 and
+2 using only the public package root outside the SDK worktree. The shared
+storage and query contracts passed against PostgreSQL 18.4 in isolated temporary
+schemas on 2026-07-15, completing criterion 3 in addition to the ordinary
+`pg-mem` coverage.
 
 ## 19. Caller-Owned Usage Patterns
 

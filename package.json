@@ -47,6 +47,7 @@
     "test:unit": "vitest run tests/unit",
     "test:storage:sqlite": "vitest run tests/storage-contract/sqlite-storage-adapter.test.ts",
     "test:storage:postgresql": "vitest run tests/storage-contract/postgresql-storage-adapter.test.ts",
+    "test:storage:postgresql:real": "vitest run tests/real-postgresql/postgresql-real.test.ts",
     "test:integration": "vitest run tests/integration",
     "test:live-rpc": "vitest run tests/live-rpc",
     "test:git-install": "node scripts/test-git-install.mjs",

@@ -14,8 +14,9 @@ transport/pool, adaptive synchronization, checkpoint/reorg recovery, lockfile,
 database-only query/cursor pagination, the public `EVMEventLake` client, local
 HTTP end-to-end tests, gated live RPC verification, a narrow package-root API,
 clean Git dependency installation, and a standalone GitHub consumer example are
-implemented. Remote GitHub-reference verification and credentialed real
-PostgreSQL verification remain release gates.
+implemented. Installation from a GitHub-hosted full commit and the shared
+contracts against PostgreSQL 18.4 are also verified. A semantic release tag and
+explicit public license remain release decisions.
 
 ## 2. Toolchain
 
@@ -398,6 +399,7 @@ Focused suites:
 pnpm run test:unit
 pnpm run test:storage:sqlite
 pnpm run test:storage:postgresql
+pnpm run test:storage:postgresql:real
 pnpm run test:integration
 pnpm run test:git-install
 pnpm run test:github-install
@@ -405,8 +407,18 @@ pnpm run test:github-install
 
 The PostgreSQL storage contract currently runs through `pg-mem` using Kysely's
 PostgreSQL dialect and the standard `pg.Pool` interface. A real PostgreSQL
-server verification remains required before release; `pg-mem` is not presented
-as production database evidence.
+server verification is explicitly gated so ordinary tests never require
+credentials:
+
+```bash
+EVM_EVENT_LAKE_POSTGRESQL_TEST_URL='postgresql://<user>:<password>@<host>:<port>/<database>' \
+pnpm run test:storage:postgresql:real
+```
+
+Each real-server contract test creates a unique schema, points its connection
+pool at that schema, and drops the schema with `CASCADE` during cleanup. It does
+not use or modify the database's existing application tables. `pg-mem` is not
+presented as production database evidence.
 
 The live RPC test is opt-in and uses a documented stable Base USDC sample:
 
@@ -476,9 +488,10 @@ Node.js `24.2.0` and the supported minimum Node.js `22.23.1`:
 - The consumer lockfile recorded the expected Git commit rather than an npm
   registry resolution.
 
-The GitHub-hosted form cannot be verified until the commits are pushed. The
-current remote has no branch or tag reference. Pushing or creating a remote tag
-still requires explicit user approval.
+The GitHub-hosted full-commit form was verified from clean remote commit
+`7eb95d90bae26f229329fcc0c483dcce43fad08a` on 2026-07-15. The remote has a
+`main` branch but no semantic release tag. Creating or pushing a tag still
+requires explicit user approval.
 
 For each release candidate:
 
