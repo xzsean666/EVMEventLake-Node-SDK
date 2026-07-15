@@ -92,6 +92,9 @@ export function classifyRpcFailure(
   if (containsAny(normalizedMessage, TIMEOUT_TEXT)) {
     return "timeout";
   }
+  if (input.rpcCode !== undefined && FATAL_JSON_RPC_CODES.has(input.rpcCode)) {
+    return "invalid_response";
+  }
   if (input.statusCode !== undefined && input.statusCode >= 500) {
     return "server";
   }
@@ -104,6 +107,11 @@ export function classifyRpcFailure(
 function containsAny(message: string, candidates: readonly string[]): boolean {
   return candidates.some((candidate) => message.includes(candidate));
 }
+
+// Standard JSON-RPC 2.0 error codes for malformed requests: parse error,
+// invalid request, method not found, invalid params. These are permanently
+// fatal for the given request and never resolved by retrying.
+const FATAL_JSON_RPC_CODES = new Set([-32700, -32600, -32601, -32602]);
 
 const RANGE_LIMIT_TEXT = [
   "block range",

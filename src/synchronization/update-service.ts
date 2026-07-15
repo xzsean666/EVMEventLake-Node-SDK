@@ -326,10 +326,14 @@ export class UpdateService {
               decodeFailedLogs += 1;
             return storedLog;
           });
+          // Deliberately not pinned to fetchedRange.endpointIdentity: this
+          // header is the independent check that the logs above are
+          // consistent with the canonical chain, so it must not be served by
+          // the same endpoint that produced those logs (a single endpoint
+          // stuck on a stale fork would otherwise validate its own bad data).
           const endBlockHeader = await this.#rpc.getBlockHeader(
             fetchedRange.range.toBlock,
             {
-              preferredEndpointIdentity: fetchedRange.endpointIdentity,
               ...(options.signal === undefined
                 ? {}
                 : { signal: options.signal }),

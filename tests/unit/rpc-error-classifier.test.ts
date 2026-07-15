@@ -37,6 +37,23 @@ describe("classifyRpcFailure", () => {
     ).toBe("rpc");
   });
 
+  it("classifies well-known fatal JSON-RPC codes even with unrecognized wording", () => {
+    expect(
+      classifyRpcFailure({
+        message: "computer says no",
+        method: "eth_getLogs",
+        rpcCode: -32_602,
+      }),
+    ).toBe("invalid_response");
+    expect(
+      classifyRpcFailure({
+        message: "computer says no",
+        method: "eth_getLogs",
+        rpcCode: -32_700,
+      }),
+    ).toBe("invalid_response");
+  });
+
   it("redacts credentials and query secrets in failure context", () => {
     const error = new RpcRequestFailure("failed", {
       category: "transport",

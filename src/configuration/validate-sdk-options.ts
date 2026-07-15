@@ -168,6 +168,15 @@ export function normalizeRpcUrls(
         { context: { rpcUrl: redactUrl(rpcUrl) } },
       );
     }
+    if (
+      parsedUrl.protocol === "http:" &&
+      !isLoopbackHostname(parsedUrl.hostname)
+    ) {
+      throw new ConfigurationValidationError(
+        "RPC endpoints must use HTTPS unless connecting to a loopback host (RPC URLs commonly embed API keys, which HTTP would send in cleartext)",
+        { context: { rpcUrl: redactUrl(rpcUrl) } },
+      );
+    }
     if (parsedUrl.hash !== "") {
       throw new ConfigurationValidationError(
         "RPC endpoint URL must not contain a fragment",
@@ -183,6 +192,15 @@ export function normalizeRpcUrls(
   }
 
   return Object.freeze(normalizedUrls);
+}
+
+function isLoopbackHostname(hostname: string): boolean {
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "::1" ||
+    hostname === "[::1]"
+  );
 }
 
 function normalizeSynchronizationPolicy(

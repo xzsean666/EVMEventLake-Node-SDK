@@ -58,7 +58,8 @@ export function decodeRawEventLog(
   rawLog: RawEvmLog,
 ): EventDecodeResult {
   const topicCandidates = catalog.findByTopic0(rawLog.topics[0]);
-  const candidates = [...topicCandidates, ...catalog.anonymousEvents];
+  const candidates =
+    topicCandidates.length > 0 ? topicCandidates : catalog.anonymousEvents;
   if (candidates.length === 0) {
     return { status: "unknown" };
   }
@@ -102,6 +103,16 @@ function decodeCandidate(
   definition: EventDefinition,
   rawLog: RawEvmLog,
 ): DecodedEventResult {
+  if (!definition.anonymous) {
+    const indexedInputCount = definition.abiEvent.inputs.filter(
+      (input) => input.indexed === true,
+    ).length;
+    if (rawLog.topics.length !== indexedInputCount + 1) {
+      throw new Error(
+        "Event log topic count does not match the ABI indexed parameter count",
+      );
+    }
+  }
   const decodedArguments = definition.anonymous
     ? decodeAnonymousEvent(definition.abiEvent, rawLog)
     : (decodeEventLog({
@@ -201,7 +212,7 @@ function createDecodedParameter(
   });
 }
 
-function readDecodedArgument(
+export function readDecodedArgument(
   decodedArguments: unknown,
   name: string | undefined,
   position: number,
@@ -223,13 +234,15 @@ function normalizeDecodedParameterValue(
   input: AbiEvent["inputs"][number],
   value: unknown,
 ): unknown {
-  if (typeof value === "string") {
-    if (input.type === "address") {
-      return getAddress(value).toLowerCase();
-    }
-    if (input.type.startsWith("bytes")) {
-      return value.toLowerCase();
-    }
+  if (typeof value !== "string") return value;
+  if (input.type === "address") {
+    return getAddress(value).toLowerCase();
+  }
+  if (input.type.startsWith("bytes")) {
+    return value.toLowerCase();
+  }
+  if (input.indexed === true && isHashedIndexedType(input.type)) {
+    return value.toLowerCase();
   }
   return value;
 }

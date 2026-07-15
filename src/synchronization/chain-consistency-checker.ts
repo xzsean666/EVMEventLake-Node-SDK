@@ -27,9 +27,14 @@ export async function ensureChainConsistency(input: {
   readonly storage: StorageAdapter;
   readonly targetKey: string;
 }): Promise<ChainConsistencyResult> {
+  // Fetch one extra checkpoint beyond reorgCheckDepth: checkpoints[0] is the
+  // "latest" checkpoint being verified, and the remaining reorgCheckDepth
+  // checkpoints are the fallback candidates checked on a mismatch. Without
+  // the +1, only reorgCheckDepth - 1 fallback checkpoints were ever checked
+  // (and with reorgCheckDepth: 1, none were).
   const checkpoints = await input.storage.getRecentCheckpoints(
     input.targetKey,
-    input.reorgCheckDepth,
+    input.reorgCheckDepth + 1,
   );
   if (checkpoints.length === 0) {
     return Object.freeze({

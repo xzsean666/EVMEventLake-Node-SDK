@@ -74,14 +74,11 @@ describe("RpcPool", () => {
     ).toHaveLength(DEFAULT_RPC_POLICY.maxRetriesPerEndpoint + 1);
   });
 
-  it("returns range and timeout failures immediately to the adaptive fetcher", async () => {
-    const failureCategory = {
-      current: "range_limit" as "range_limit" | "timeout",
-    };
+  it("returns range failures immediately to the adaptive fetcher", async () => {
     const transport = new FakeRpcTransport((request) => {
       if (request.method === "eth_chainId") return "0x1";
       throw new RpcRequestFailure("logs failed", {
-        category: failureCategory.current,
+        category: "range_limit",
         endpointUrl: request.endpointUrl,
         method: request.method,
       });
@@ -91,10 +88,35 @@ describe("RpcPool", () => {
     await expect(
       pool.fetchLogs("0x0000000000000000000000000000000000000001", 1n, 100n),
     ).rejects.toMatchObject({ category: "range_limit" });
-    failureCategory.current = "timeout";
+  });
+
+  it("retries a timeout and fails over instead of aborting immediately", async () => {
+    const transport = new FakeRpcTransport((request) => {
+      if (request.method === "eth_chainId") return "0x1";
+      throw new RpcRequestFailure("logs failed", {
+        category: "timeout",
+        endpointUrl: request.endpointUrl,
+        method: request.method,
+      });
+    });
+    const pool = createPool(
+      ["https://first.example", "https://second.example"],
+      transport,
+    );
+
     await expect(
       pool.fetchLogs("0x0000000000000000000000000000000000000001", 1n, 50n),
-    ).rejects.toMatchObject({ category: "timeout" });
+    ).rejects.toMatchObject({
+      cause: { category: "timeout" },
+      code: "RPC_REQUEST_EXHAUSTED",
+    });
+    expect(
+      transport.requests.some(
+        (request) =>
+          request.endpointUrl.includes("second") &&
+          request.method === "eth_getLogs",
+      ),
+    ).toBe(true);
   });
 
   it("reports no valid endpoint when every endpoint is cooling down", async () => {

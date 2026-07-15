@@ -1,6 +1,11 @@
 import type { DeleteResult, InsertResult, Kysely, UpdateResult } from "kysely";
 import type { Address, Hex } from "viem";
 
+import { decodeDecodedValue } from "../abi/decoded-value-codec.js";
+import {
+  readDecodedArgument,
+  type DecodedEventParameter,
+} from "../abi/event-decoder.js";
 import {
   StorageConsistencyError,
   StorageInitializationError,
@@ -492,7 +497,38 @@ export class SqlStorageAdapter implements StorageAdapter {
       .orderBy("event_id", direction)
       .limit(input.limit)
       .execute();
-    return Object.freeze(rows.map((row) => rowToStoredEventLog(row)));
+    if (rows.length === 0) return Object.freeze([]);
+
+    const parameterRows = await this.#database
+      .selectFrom("event_parameters")
+      .selectAll()
+      .where(
+        "event_id",
+        "in",
+        rows.map((row) => row.event_id),
+      )
+      .execute();
+    const parameterRowsByEventId = new Map<
+      string,
+      StorageDatabaseSchema["event_parameters"][]
+    >();
+    for (const parameterRow of parameterRows) {
+      const existing = parameterRowsByEventId.get(parameterRow.event_id);
+      if (existing === undefined) {
+        parameterRowsByEventId.set(parameterRow.event_id, [parameterRow]);
+      } else {
+        existing.push(parameterRow);
+      }
+    }
+
+    return Object.freeze(
+      rows.map((row) =>
+        rowToStoredEventLog(
+          row,
+          parameterRowsByEventId.get(row.event_id) ?? [],
+        ),
+      ),
+    );
   }
 
   public async close(): Promise<void> {
@@ -704,6 +740,7 @@ function eventLogToRow(
 
 function rowToStoredEventLog(
   row: StorageDatabaseSchema["event_logs"],
+  parameterRows: readonly StorageDatabaseSchema["event_parameters"][],
 ): StoredEventLog {
   return Object.freeze({
     abiFingerprint: row.abi_fingerprint,
@@ -717,13 +754,43 @@ function rowToStoredEventLog(
     eventName: row.event_name,
     eventSignature: row.event_signature,
     logIndex: row.log_index,
-    parameters: Object.freeze([]),
+    parameters: rowsToDecodedParameters(parameterRows, row.decoded_arguments),
     removed: row.removed === 1,
     targetKey: row.target_key,
     topics: Object.freeze(JSON.parse(row.topics_json) as Hex[]),
     transactionHash: row.transaction_hash as Hex,
     transactionIndex: row.transaction_index,
   });
+}
+
+function rowsToDecodedParameters(
+  parameterRows: readonly StorageDatabaseSchema["event_parameters"][],
+  decodedArgumentsJson: string | null,
+): readonly DecodedEventParameter[] {
+  if (parameterRows.length === 0) return Object.freeze([]);
+  const decodedArguments =
+    decodedArgumentsJson === null
+      ? undefined
+      : decodeDecodedValue(decodedArgumentsJson);
+  return Object.freeze(
+    [...parameterRows]
+      .sort((left, right) => left.position - right.position)
+      .map((parameterRow) =>
+        Object.freeze({
+          comparableValue: parameterRow.comparable_value,
+          indexed: parameterRow.is_indexed === 1,
+          name: parameterRow.name,
+          position: parameterRow.position,
+          rawTopicValue: (parameterRow.raw_topic as Hex | null) ?? null,
+          solidityType: parameterRow.solidity_type,
+          value: readDecodedArgument(
+            decodedArguments,
+            parameterRow.name,
+            parameterRow.position,
+          ),
+        }),
+      ),
+  );
 }
 
 function mapCheckpoint(

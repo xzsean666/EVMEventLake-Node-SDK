@@ -26,6 +26,43 @@ interface JsonRpcResponse {
   readonly result?: unknown;
 }
 
+// Defensive cap on how much of an RPC response body we'll buffer into memory.
+// A misbehaving or malicious endpoint could otherwise return an unbounded
+// response and exhaust process memory before JSON parsing even starts.
+const MAX_RESPONSE_BYTES = 64 * 1024 * 1024;
+
+async function readBoundedResponseText(
+  response: Response,
+  maxBytes: number,
+): Promise<string> {
+  const reader = response.body?.getReader();
+  if (reader === undefined) {
+    return response.text();
+  }
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    for (;;) {
+      const chunk = (await reader.read()) as {
+        readonly done: boolean;
+        readonly value?: Uint8Array;
+      };
+      if (chunk.done || chunk.value === undefined) break;
+      totalBytes += chunk.value.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel().catch(() => undefined);
+        throw new RpcResponseTooLargeError();
+      }
+      chunks.push(chunk.value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+class RpcResponseTooLargeError extends Error {}
+
 export class HttpEvmRpcClient implements RpcTransport {
   #requestId = 0;
 
@@ -59,7 +96,10 @@ export class HttpEvmRpcClient implements RpcTransport {
         method: "POST",
         signal: abortController.signal,
       });
-      const responseText = await response.text();
+      const responseText = await readBoundedResponseText(
+        response,
+        MAX_RESPONSE_BYTES,
+      );
       if (!response.ok) {
         const retryAfterMs = parseRetryAfter(
           response.headers.get("retry-after"),
@@ -144,6 +184,17 @@ export class HttpEvmRpcClient implements RpcTransport {
       return rpcResponse.result;
     } catch (error) {
       if (error instanceof RpcRequestFailure) throw error;
+      if (error instanceof RpcResponseTooLargeError) {
+        throw new RpcRequestFailure(
+          "RPC response exceeded the maximum allowed size",
+          {
+            category: "invalid_response",
+            cause: error,
+            endpointUrl: request.endpointUrl,
+            method: request.method,
+          },
+        );
+      }
       if (!timedOut && abortController.signal.aborted) {
         throw new OperationCancelledError("RPC request was cancelled", {
           cause: error,

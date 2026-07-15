@@ -113,6 +113,36 @@ describe("validateSdkOptions", () => {
     ).toThrow(AbiValidationError);
   });
 
+  it("rejects plaintext HTTP RPC endpoints on non-loopback hosts", () => {
+    const validOptions = {
+      abi: transferAbi,
+      chainId: 1,
+      contractAddress: "0x0000000000000000000000000000000000000001",
+      database: "sqlite://events.db",
+      startBlock: 0n,
+    } as const;
+
+    expect(() =>
+      validateSdkOptions({
+        ...validOptions,
+        rpcUrls: ["http://rpc.example.com"],
+      }),
+    ).toThrow(ConfigurationValidationError);
+
+    expect(
+      validateSdkOptions({
+        ...validOptions,
+        rpcUrls: ["http://127.0.0.1:8545"],
+      }).rpcUrls,
+    ).toEqual(["http://127.0.0.1:8545/"]);
+    expect(
+      validateSdkOptions({
+        ...validOptions,
+        rpcUrls: ["http://localhost:8545"],
+      }).rpcUrls,
+    ).toEqual(["http://localhost:8545/"]);
+  });
+
   it("rejects policy ranges that cannot shrink safely", () => {
     expect(() =>
       validateSdkOptions({

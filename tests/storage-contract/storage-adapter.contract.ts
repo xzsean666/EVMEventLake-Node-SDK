@@ -175,6 +175,7 @@ export function runStorageAdapterContract(
       });
       expect(events).toHaveLength(1);
       expect(events[0]?.eventId).toBe(log.eventId);
+      expect(events[0]?.parameters).toEqual(log.parameters);
     });
 
     it("rejects a commit that does not start at the durable cursor", async () => {

@@ -74,6 +74,18 @@ interface EndpointRequestResult<Value> {
   readonly value: Value;
 }
 
+// Upper bound on how long we'll honor a server-provided Retry-After / cooldown
+// hint, so a broken or hostile endpoint can't stall retries indefinitely.
+const MAX_RETRY_DELAY_MS = 60_000;
+
+// Defensive limits on eth_getLogs responses: the EVM caps LOG opcodes at 4
+// topics (LOG0..LOG4), so more than that is malformed data, not just large
+// data. The count/size limits guard against a misbehaving endpoint returning
+// an unbounded response that would otherwise be fully buffered into memory.
+const MAX_LOG_ENTRIES = 50_000;
+const MAX_LOG_TOPICS = 4;
+const MAX_LOG_DATA_BYTES = 1_048_576;
+
 export class RpcPool {
   readonly #chainId: number;
   readonly #endpoints: readonly RpcEndpoint[];
@@ -165,7 +177,7 @@ export class RpcPool {
       ],
       parseRpcLogs,
       {
-        immediateFailureCategories: new Set(["range_limit", "timeout"]),
+        immediateFailureCategories: new Set(["range_limit"]),
         ...(options.preferredEndpointIdentity === undefined
           ? {}
           : { preferredEndpointIdentity: options.preferredEndpointIdentity }),
@@ -234,7 +246,16 @@ export class RpcPool {
           throw error;
         }
         lastFailure = error;
-        endpoint.markCoolingDown(this.#now(), this.#policy.endpointCooldownMs);
+        const serverRetryAfterMs =
+          error instanceof RpcRequestFailure ? error.retryAfterMs : undefined;
+        const cooldownMs =
+          serverRetryAfterMs === undefined
+            ? this.#policy.endpointCooldownMs
+            : Math.max(
+                this.#policy.endpointCooldownMs,
+                Math.min(serverRetryAfterMs, MAX_RETRY_DELAY_MS),
+              );
+        endpoint.markCoolingDown(this.#now(), cooldownMs);
       }
     }
 
@@ -320,10 +341,11 @@ export class RpcPool {
         }
         lastFailure = failure;
         if (attempt === this.#policy.maxRetriesPerEndpoint) break;
-        await this.#sleep(
-          Math.min(failure.retryAfterMs ?? 100 * (attempt + 1), 1_000),
-          options.signal,
-        );
+        const delayMs =
+          failure.retryAfterMs === undefined
+            ? Math.min(100 * (attempt + 1), 1_000)
+            : Math.min(failure.retryAfterMs, MAX_RETRY_DELAY_MS);
+        await this.#sleep(delayMs, options.signal);
       }
     }
     if (lastFailure === undefined) {
@@ -382,11 +404,21 @@ function parseBlockHeader(
 function parseRpcLogs(value: unknown): readonly RpcLog[] {
   if (!Array.isArray(value))
     throw new TypeError("RPC logs result must be an array");
+  if (value.length > MAX_LOG_ENTRIES) {
+    throw new TypeError(
+      `RPC logs result exceeds the maximum allowed entries of ${MAX_LOG_ENTRIES}`,
+    );
+  }
   return Object.freeze(
     value.map((logValue) => {
       const log = assertRecord(logValue, "event log");
       if (!Array.isArray(log.topics)) {
         throw new TypeError("RPC log topics must be an array");
+      }
+      if (log.topics.length > MAX_LOG_TOPICS) {
+        throw new TypeError(
+          `RPC log must not contain more than ${MAX_LOG_TOPICS} topics`,
+        );
       }
       const address = assertHexBytes(log.address, "log address", 20);
       if (!isAddress(address, { strict: false })) {
@@ -399,7 +431,7 @@ function parseRpcLogs(value: unknown): readonly RpcLog[] {
         address,
         blockHash: assertHexBytes(log.blockHash, "log block hash", 32),
         blockNumber: parseHexQuantity(log.blockNumber),
-        data: assertHexData(log.data, "log data"),
+        data: assertHexData(log.data, "log data", MAX_LOG_DATA_BYTES),
         logIndex: parseRpcIndex(log.logIndex, "log index"),
         removed: log.removed,
         topics: Object.freeze(
@@ -441,9 +473,18 @@ function assertHexBytes(
   return value.toLowerCase() as Hex;
 }
 
-function assertHexData(value: unknown, label: string): Hex {
+function assertHexData(
+  value: unknown,
+  label: string,
+  maxByteLength?: number,
+): Hex {
   if (typeof value !== "string" || !/^0x(?:[0-9a-f]{2})*$/i.test(value)) {
     throw new TypeError(`RPC ${label} must contain complete hexadecimal bytes`);
+  }
+  if (maxByteLength !== undefined && (value.length - 2) / 2 > maxByteLength) {
+    throw new TypeError(
+      `RPC ${label} exceeds the maximum allowed length of ${maxByteLength} bytes`,
+    );
   }
   return value.toLowerCase() as Hex;
 }

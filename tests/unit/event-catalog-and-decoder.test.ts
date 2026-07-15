@@ -122,6 +122,57 @@ describe("decodeRawEventLog", () => {
     );
   });
 
+  it("does not decode a log with more topics than the ABI's indexed count", () => {
+    const from = getAddress("0x0000000000000000000000000000000000000001");
+    const to = getAddress("0x0000000000000000000000000000000000000002");
+    const topics = encodeEventTopics({
+      abi: transferAbi,
+      eventName: "Transfer",
+      args: { from, to },
+    }) as unknown as readonly Hex[];
+    const data = encodeAbiParameters([{ type: "uint256" }], [123n]);
+    const forgedTopics = [...topics, `0x${"ff".repeat(32)}`] as readonly Hex[];
+
+    const result = decodeRawEventLog(
+      new EventCatalog(transferAbi),
+      createRawLog({ data, topics: forgedTopics }),
+    );
+
+    expect(result.status).toBe("decode_failed");
+  });
+
+  it("does not let an anonymous event clobber a real topic0 match", () => {
+    const anonymousAbi = [
+      ...transferAbi,
+      {
+        anonymous: true,
+        inputs: [
+          { indexed: true, name: "a", type: "address" },
+          { indexed: true, name: "b", type: "address" },
+        ],
+        name: "AnonymousSameShape",
+        type: "event",
+      },
+    ] as const satisfies Abi;
+    const from = getAddress("0x0000000000000000000000000000000000000001");
+    const to = getAddress("0x0000000000000000000000000000000000000002");
+    const topics = encodeEventTopics({
+      abi: transferAbi,
+      eventName: "Transfer",
+      args: { from, to },
+    }) as unknown as readonly Hex[];
+    const data = encodeAbiParameters([{ type: "uint256" }], [123n]);
+
+    const result = decodeRawEventLog(
+      new EventCatalog(anonymousAbi),
+      createRawLog({ data, topics }),
+    );
+
+    expect(result.status).toBe("decoded");
+    if (result.status !== "decoded") return;
+    expect(result.eventSignature).toBe("Transfer(address,address,uint256)");
+  });
+
   it("decodes anonymous events by testing anonymous ABI candidates", () => {
     const anonymousAbi = [
       {
