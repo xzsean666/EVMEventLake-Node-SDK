@@ -462,15 +462,17 @@ example files are modified.
 
 ## 14. Git Installation Verification
 
-Verified locally on 2026-07-14 with a clean exact Git commit:
+Verified locally on 2026-07-15 with clean exact Git commit `1968a18` under both
+Node.js `24.2.0` and the supported minimum Node.js `22.23.1`:
 
 - The Git dependency ran `prepare` and built `dist/` without committed output.
 - TypeScript consumed `EVMEventLakeOptions`, `EventQuery`, `SyncStatus`, and
   `UpdateResult` from the package root.
 - Runtime imports exposed the public client and errors without internal RPC,
   storage, ABI, or synchronization classes.
-- `better-sqlite3` installed successfully and a consumer created, queried, and
-  closed a SQLite-backed client.
+- `better-sqlite3` installed successfully for each Node runtime and a consumer
+  synchronized, queried, paginated, read offline, and closed a SQLite-backed
+  client.
 - The consumer lockfile recorded the expected Git commit rather than an npm
   registry resolution.
 

@@ -322,9 +322,10 @@ must be rerun with a GitHub-hosted SHA after push approval.
 
 ### 9.3 Native SQLite dependency
 
-Resolved for the current Linux Node.js 24.2.0 environment and exact Git install.
-macOS, Windows, other CPU architectures, and the Node.js 22 minimum still need
-release-matrix verification when those environments are available.
+Resolved for exact clean Git installs on the current Linux environment with
+Node.js `24.2.0` and the supported minimum Node.js `22.23.1`.
+macOS, Windows, and other CPU architectures still need release-matrix
+verification when those environments are available.
 
 ### 9.4 Exact dependency versions
 
@@ -391,22 +392,21 @@ metadata aligned.
 - `pnpm run verify` passed with 63 tests passing and one gated live test skipped.
 - The explicitly enabled Base USDC live RPC test passed after strict JSON-RPC,
   block-header, hash/topic, data, flag, and index validation was added.
-- The explicitly enabled Base USDC live RPC test passed.
 - `pnpm run test:integration` passed all local integration files.
-- `pnpm run test:git-install` passed from exact clean commit `89895f8`, including
-  `prepare`, TypeScript declarations, public runtime imports, and SQLite native
-  usage.
-- The expanded standalone consumer has been validated against the working SDK
-  through focused source/integration checks; rerun its exact Git install after
-  committing the current changes.
+- `pnpm run test:git-install` passed from exact clean commit `1968a18`, including
+  `prepare`, TypeScript declarations, public runtime imports, SQLite native
+  usage, synchronization, failover/splitting, queries, pagination, offline
+  reads, observability, and lifecycle checks.
+- The same exact Git consumer passed under Node.js `22.23.1`, including a fresh
+  `better-sqlite3` installation for that runtime.
 - Runtime dependency audit through npm's current advisory endpoint reported
   zero vulnerabilities. pnpm's legacy audit endpoint returned HTTP 410 and was
   not used as evidence.
 - Required Step 1 and Step 2 documents exist in `docs/`.
 - Root `Agent.md` exists as the repository operating guide.
-- Official documentation links were reviewed on 2026-07-14; the newly added
-  Base and Circle documentation links returned HTTP 200.
-- Phases 1 through 10 were committed incrementally.
+- Official documentation links were reviewed on 2026-07-14 and 2026-07-15; the
+  newly added Base, Circle, and Node test-runner documentation links were used.
+- Phases 1 through 11 were committed incrementally.
 - No commit was pushed.
 
 ## 11. Do Not Do Next

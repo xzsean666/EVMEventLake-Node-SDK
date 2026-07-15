@@ -179,6 +179,7 @@ by this repository and tested against both databases.
 
 - Supported runtime: Node.js 22 or newer.
 - Development verification: Node.js `24.2.0`.
+- Clean minimum-runtime Git consumer verification: Node.js `22.23.1`.
 
 - Official docs: <https://nodejs.org/docs/latest/api/>
 - Built-in test runner: <https://nodejs.org/docs/latest/api/test.html>
