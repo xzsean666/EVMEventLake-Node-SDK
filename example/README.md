@@ -1,5 +1,7 @@
 # Standalone GitHub Consumer Example
 
+> **Note**: If you are looking for runnable application usage examples and code snippets, see the [`../examples/`](../examples/README.md) directory. This `example/` directory is specifically maintained as an independent consumer fixture for Git/GitHub installation testing.
+
 This directory is an independent consumer project. It is not a package in the
 SDK repository workspace and it never imports `../src`, `../dist`, or a local
 workspace link. Its dependency is a GitHub tag, so successful installation and

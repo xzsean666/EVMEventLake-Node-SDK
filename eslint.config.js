@@ -9,10 +9,20 @@ export default typescriptEslint.config(
   eslint.configs.recommended,
   ...typescriptEslint.configs.recommendedTypeChecked.map((configuration) => ({
     ...configuration,
-    files: ["src/**/*.ts", "tests/**/*.ts", "vitest.config.ts"],
+    files: [
+      "src/**/*.ts",
+      "tests/**/*.ts",
+      "vitest.config.ts",
+      "examples/**/*.ts",
+    ],
   })),
   {
-    files: ["src/**/*.ts", "tests/**/*.ts", "vitest.config.ts"],
+    files: [
+      "src/**/*.ts",
+      "tests/**/*.ts",
+      "vitest.config.ts",
+      "examples/**/*.ts",
+    ],
     languageOptions: {
       globals: globals.node,
       parserOptions: {
