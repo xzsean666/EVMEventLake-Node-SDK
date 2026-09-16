@@ -406,6 +406,11 @@ function normalizeIndexedValue(solidityType: string, value: unknown): unknown {
       ) {
         throw new Error("unsupported integer type");
       }
+      if (typeof value === "string") {
+        if (value.trim() === "" || !/^-?\d+$/.test(value.trim())) {
+          throw new Error("invalid integer string format");
+        }
+      }
       const normalizedValue = BigInt(value);
       const bitWidth = integerMatch[2] === "" ? 256 : Number(integerMatch[2]);
       if (
@@ -455,14 +460,19 @@ function normalizeIndexedValue(solidityType: string, value: unknown): unknown {
       );
     }
     if (solidityType === "bytes") {
-      if (typeof value === "string" && isHex(value)) {
-        return keccak256(value).toLowerCase();
+      if (typeof value === "string") {
+        if (value.startsWith("0x")) {
+          if (!isHex(value)) {
+            throw new QueryValidationError(
+              "Indexed bytes hex value is invalid",
+            );
+          }
+          return keccak256(value).toLowerCase();
+        }
+        return keccak256(stringToBytes(value)).toLowerCase();
       }
       if (value instanceof Uint8Array) {
         return keccak256(value).toLowerCase();
-      }
-      if (typeof value === "string") {
-        return keccak256(stringToBytes(value)).toLowerCase();
       }
       throw new QueryValidationError(
         "Indexed bytes value must be a hex string, Uint8Array, or 32-byte topic hash",
@@ -510,6 +520,11 @@ function normalizeUnindexedValue(
         typeof value !== "string"
       ) {
         throw new Error("unsupported integer type");
+      }
+      if (typeof value === "string") {
+        if (value.trim() === "" || !/^-?\d+$/.test(value.trim())) {
+          throw new Error("invalid integer string format");
+        }
       }
       const normalizedValue = BigInt(value);
       const bitWidth = integerMatch[2] === "" ? 256 : Number(integerMatch[2]);

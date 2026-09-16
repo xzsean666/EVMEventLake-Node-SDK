@@ -813,15 +813,58 @@ export class IndexeddbStorageAdapter implements StorageAdapter {
           }
         }
 
-        const lowerBound = [input.targetKey, minBlockKey, 0, 0, ""];
-        const upperBound = [
+        let lowerBound: [string, string, number, number, string] = [
+          input.targetKey,
+          minBlockKey,
+          0,
+          0,
+          "",
+        ];
+        let upperBound: [string, string, number, number, string] = [
           input.targetKey,
           maxBlockKey,
           Number.MAX_SAFE_INTEGER,
           Number.MAX_SAFE_INTEGER,
           "\uffff",
         ];
-        const keyRange = IDBKeyRange.bound(lowerBound, upperBound);
+        let lowerOpen = false;
+        let upperOpen = false;
+
+        if (input.after !== undefined) {
+          const afterBlockKey = blockNumberToStorageKey(
+            input.after.blockNumber,
+          );
+          if (input.order === "ascending") {
+            if (afterBlockKey >= minBlockKey) {
+              lowerBound = [
+                input.targetKey,
+                afterBlockKey,
+                input.after.transactionIndex,
+                input.after.logIndex,
+                input.after.eventId,
+              ];
+              lowerOpen = true;
+            }
+          } else {
+            if (afterBlockKey <= maxBlockKey) {
+              upperBound = [
+                input.targetKey,
+                afterBlockKey,
+                input.after.transactionIndex,
+                input.after.logIndex,
+                input.after.eventId,
+              ];
+              upperOpen = true;
+            }
+          }
+        }
+
+        const keyRange = IDBKeyRange.bound(
+          lowerBound,
+          upperBound,
+          lowerOpen,
+          upperOpen,
+        );
         const idbDirection: IDBCursorDirection =
           input.order === "ascending" ? "next" : "prev";
 
@@ -847,6 +890,11 @@ export class IndexeddbStorageAdapter implements StorageAdapter {
               return;
             }
             const row = cursor.value as EventLogStoreRow;
+
+            if (row.removed) {
+              cursor.continue();
+              return;
+            }
 
             if (
               candidateEventIds !== null &&

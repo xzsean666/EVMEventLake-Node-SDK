@@ -143,10 +143,22 @@ export function isRpcBatchRejection(error: unknown): boolean {
   if (!(error instanceof RpcRequestFailure)) {
     return false;
   }
-  if (error.statusCode === 405 || error.statusCode === 501) {
+  if (
+    error.statusCode === 405 ||
+    error.statusCode === 413 ||
+    error.statusCode === 422 ||
+    error.statusCode === 501
+  ) {
     return true;
   }
   const normalized = error.message.toLowerCase();
+  if (
+    normalized.includes("payload too large") ||
+    normalized.includes("request entity too large") ||
+    normalized.includes("entity too large")
+  ) {
+    return true;
+  }
   if (
     normalized.includes("batch") &&
     (normalized.includes("not support") ||
@@ -158,7 +170,8 @@ export function isRpcBatchRejection(error: unknown): boolean {
       normalized.includes("limit") ||
       normalized.includes("invalid") ||
       normalized.includes("forbidden") ||
-      normalized.includes("rejected"))
+      normalized.includes("rejected") ||
+      normalized.includes("too large"))
   ) {
     return true;
   }

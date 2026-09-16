@@ -4,7 +4,12 @@ import typescriptEslint from "typescript-eslint";
 
 export default typescriptEslint.config(
   {
-    ignores: ["dist/**", "node_modules/**", "coverage/**"],
+    ignores: [
+      "dist/**",
+      "node_modules/**",
+      "coverage/**",
+      "examples/**/dist/**",
+    ],
   },
   eslint.configs.recommended,
   ...typescriptEslint.configs.recommendedTypeChecked.map((configuration) => ({

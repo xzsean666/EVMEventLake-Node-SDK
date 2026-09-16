@@ -85,7 +85,13 @@ async function readBoundedResponseText(
   } finally {
     reader.releaseLock();
   }
-  return Buffer.concat(chunks).toString("utf8");
+  const merged = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(merged);
 }
 
 class RpcResponseTooLargeError extends Error {}

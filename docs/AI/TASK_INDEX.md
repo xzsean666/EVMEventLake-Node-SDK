@@ -36,14 +36,16 @@ TODO -> IN_PROGRESS -> REVIEW -> DONE
 | **`TASK-008`** | Proxy Contract Historical Re-decoding Design | **DONE** | `TASK-000` | Add `redecode()` operation allowing historical raw logs to be re-decoded upon contract ABI upgrades. | [`TASK-008.md`](tasks/TASK-008.md) |
 | **`TASK-009`** | RPC Batch Requesting & Adaptive Pipelining | **DONE** | `TASK-001` | Implement JSON-RPC batching and request pipelining to accelerate large block interval sync. | [`TASK-009.md`](tasks/TASK-009.md) |
 | **`TASK-010`** | Indexed Dynamic Values & Parameter Search | **DONE** | `TASK-000` | Transparent topic hashing for dynamic string/bytes and accelerated non-indexed query indices. | [`TASK-010.md`](tasks/TASK-010.md) |
+| **`TASK-011`** | Comprehensive Audit Hardening & Security, Performance, and Correctness Optimization | **DONE** | `TASK-010` | SQL variable chunking, redecode catalog sync, browser Buffer decoupling, IndexedDB O(1) keyset pagination, query validation hardening, and RPC batch resilience. | [`TASK-011.md`](tasks/TASK-011.md) |
 
 ---
 
 ## 3. Execution Priority & Next Up
 
-1. **Status**: **ALL TASKS COMPLETE (TASK-000 through TASK-010)**.
-   - All foundational and optimization roadmap items implemented, integrated, and verified with 100% contract parity across SQLite, PostgreSQL, and IndexedDB.
-   - Ready for release and production use.
+1. **Status**: **ALL TASKS COMPLETE (TASK-000 through TASK-011)**.
+   - All foundational features, audit remediations, optimizations, and parity tests complete across SQLite, PostgreSQL, and IndexedDB.
+   - Ready for production release tag `v0.1.0`.
+
 
 ---
 

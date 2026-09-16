@@ -64,11 +64,13 @@ export interface RpcPoolMetrics {
 }
 
 export interface FetchLogsOptions {
+  readonly excludeEndpointIdentity?: string;
   readonly preferredEndpointIdentity?: string;
   readonly signal?: AbortSignal;
 }
 
 export interface RpcRequestOptions {
+  readonly excludeEndpointIdentity?: string;
   readonly preferredEndpointIdentity?: string;
   readonly signal?: AbortSignal;
 }
@@ -83,6 +85,7 @@ export interface RpcPoolDependencies {
 }
 
 interface EndpointRequestOptions {
+  readonly excludeEndpointIdentity?: string;
   readonly immediateFailureCategories?: ReadonlySet<RpcFailureCategory>;
   readonly preferredEndpointIdentity?: string;
   readonly signal?: AbortSignal;
@@ -170,6 +173,9 @@ export class RpcPool {
       [toHexQuantity(blockNumber), false],
       (value) => parseBlockHeader(value, blockNumber),
       {
+        ...(options.excludeEndpointIdentity === undefined
+          ? {}
+          : { excludeEndpointIdentity: options.excludeEndpointIdentity }),
         ...(options.preferredEndpointIdentity === undefined
           ? {}
           : { preferredEndpointIdentity: options.preferredEndpointIdentity }),
@@ -418,6 +424,7 @@ export class RpcPool {
     }
     const endpoints = this.#orderedAvailableEndpoints(
       options.preferredEndpointIdentity,
+      options.excludeEndpointIdentity,
     );
     if (endpoints.length === 0) {
       throw new NoValidRpcEndpointError(
@@ -578,12 +585,23 @@ export class RpcPool {
 
   #orderedAvailableEndpoints(
     preferredEndpointIdentity: string | undefined,
+    excludeEndpointIdentity?: string,
   ): readonly RpcEndpoint[] {
     const available = this.#endpoints.filter((endpoint) =>
       endpoint.isAvailable(this.#now()),
     );
-    if (preferredEndpointIdentity === undefined) return available;
-    return [...available].sort((left, right) => {
+    const nonExcluded =
+      excludeEndpointIdentity !== undefined &&
+      available.some(
+        (endpoint) => endpoint.identity !== excludeEndpointIdentity,
+      )
+        ? available.filter(
+            (endpoint) => endpoint.identity !== excludeEndpointIdentity,
+          )
+        : available;
+
+    if (preferredEndpointIdentity === undefined) return nonExcluded;
+    return [...nonExcluded].sort((left, right) => {
       if (left.identity === preferredEndpointIdentity) return -1;
       if (right.identity === preferredEndpointIdentity) return 1;
       return 0;

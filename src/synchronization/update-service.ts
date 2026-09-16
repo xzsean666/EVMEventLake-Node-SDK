@@ -1,6 +1,15 @@
-import { randomUUID } from "node:crypto";
-
 import type { Address } from "viem";
+
+function generateUniversalUUID(): string {
+  if (typeof globalThis.crypto?.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
 import { encodeDecodedValue } from "../abi/decoded-value-codec.js";
 import { decodeRawEventLog } from "../abi/event-decoder.js";
@@ -65,7 +74,7 @@ export interface UpdateServiceDependencies {
 }
 
 export class UpdateService {
-  readonly #catalog: EventCatalog;
+  #catalog: EventCatalog;
   readonly #createOwnerToken: () => string;
   readonly #logger: SdkLogger | undefined;
   readonly #now: () => number;
@@ -88,7 +97,8 @@ export class UpdateService {
     readonly target: ContractTarget;
   }) {
     this.#catalog = input.catalog;
-    this.#createOwnerToken = input.dependencies?.createOwnerToken ?? randomUUID;
+    this.#createOwnerToken =
+      input.dependencies?.createOwnerToken ?? generateUniversalUUID;
     this.#logger = input.logger;
     this.#now = input.dependencies?.now ?? Date.now;
     this.#onProgress = input.onProgress;
@@ -97,6 +107,14 @@ export class UpdateService {
     this.#storage = input.storage;
     this.#synchronizationPolicy = input.synchronizationPolicy;
     this.#target = input.target;
+  }
+
+  public get catalog(): EventCatalog {
+    return this.#catalog;
+  }
+
+  public setCatalog(catalog: EventCatalog): void {
+    this.#catalog = catalog;
   }
 
   public async update(options: UpdateOptions = {}): Promise<UpdateResult> {
@@ -336,6 +354,7 @@ export class UpdateService {
           const endBlockHeader = await this.#rpc.getBlockHeader(
             fetchedRange.range.toBlock,
             {
+              excludeEndpointIdentity: fetchedRange.endpointIdentity,
               ...(options.signal === undefined
                 ? {}
                 : { signal: options.signal }),
@@ -585,6 +604,9 @@ function normalizeLogs(
 ): readonly RpcLog[] {
   const uniqueLogs = new Map<string, RpcLog>();
   for (const log of logs) {
+    if (log.removed) {
+      continue;
+    }
     if (log.address.toLowerCase() !== contractAddress.toLowerCase()) {
       throw new StorageConsistencyError(
         "RPC returned a log for a different contract address",

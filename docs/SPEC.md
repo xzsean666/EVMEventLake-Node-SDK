@@ -660,9 +660,34 @@ and failure. A no-op update still emits update completion.
 
 ## 17. Performance and Safety Requirements
 
-- Log inserts are batched per committed range.
+- Log inserts and parameter inserts are batched per committed range and chunked
+  to prevent database variable limits (e.g. SQLite's 32,766 parameter ceiling):
+  `BULK_LOGS_CHUNK_SIZE = 500`, `BULK_PARAMETERS_CHUNK_SIZE = 1000`, and
+  `BULK_IN_CHUNK_SIZE = 1000`. All chunks execute inside the same atomic
+  transaction.
+- Historical re-decoding via `lake.redecode()` synchronizes both query and
+  synchronization services atomically: upgraded ABIs immediately decode newly
+  ingested events on subsequent `update()` runs.
+- The SDK client runtime is completely isomorphic and decoupled from Node-only
+  globals (`Buffer`, `node:crypto`). Pagination cursors, HTTP stream decoding,
+  and UUID generation use Web standard `TextEncoder`/`TextDecoder`, `btoa`/`atob`,
+  and `globalThis.crypto`.
+- IndexedDB keyset cursor pagination computes exact boundary ranges on the
+  `by_chain_order` composite index directly from the `after` cursor, enabling
+  $O(1)$ index navigation instead of linear cursor scans.
+- Query parameter validation rejects empty strings (`""` or `"   "`) for integer
+  types and requires valid hexadecimal representations for dynamic bytes prefixed
+  with `0x`.
+- RPC batching classifies HTTP 413 (Payload Too Large), 422 (Unprocessable
+  Entity), and payload limit messages as batch rejections, falling back to
+  sequential pipelining without cooling down healthy endpoints.
+- Checkpoint end block headers enforce multi-endpoint independence via
+  `excludeEndpointIdentity` to ensure canonical chain validation across distinct
+  RPC providers.
+- Reorged/orphaned logs returned with `removed: true` are discarded during
+  synchronization ingestion in `normalizeLogs` and excluded from storage queries.
 - Queries use indexes for target, block ordering, transaction hash, event
-  signature/name, and exact indexed parameter lookup.
+  signature/name, and exact indexed/unindexed parameter lookup.
 - The implementation must not load an unbounded synchronization interval into
   memory.
 - Range-fetch children are processed in deterministic order.

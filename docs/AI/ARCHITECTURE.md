@@ -650,8 +650,16 @@ Query behavior is intentionally limited to persisted facts. There is no hidden R
 - Every SQL query is parameterized; IndexedDB queries use explicit key ranges and indexes.
 - Adapter-specific implementation remains isolated inside its adapter directory (`sqlite/`, `postgresql/`, `indexeddb/`).
 - One shared storage contract test suite runs against all three adapters (SQLite, PostgreSQL, and IndexedDB via `fake-indexeddb`).
-- Event ordering, cursor encoding, duplicate handling, transaction atomicity, and rewind behavior must be identical across adapters.
 - SQLite is optimized for single-process local servers/CLIs; PostgreSQL is the choice for concurrent server workloads; IndexedDB is the native storage engine for frontend browser web applications.
+
+### 11.1 Audit Hardening, Batch Chunking & Performance Protections
+- **SQL Variable Chunking**: SQLite enforces a strict ceiling of 32,766 query variables (`SQLITE_MAX_VARIABLE_NUMBER`). Committing dense block intervals containing 2,000+ logs with parameters exceeds this limit if inserted in a single statement. `SqlStorageAdapter` chunks inserts and deletes into atomic batches (`BULK_LOGS_CHUNK_SIZE = 500`, `BULK_PARAMETERS_CHUNK_SIZE = 1000`, `BULK_IN_CHUNK_SIZE = 1000`) executing within the same transactional boundary.
+- **Proxy Contract Redecode Synchronization**: When `lake.redecode({ abi })` upgrades the catalog, both `EventQueryService` and `UpdateService` receive the merged `EventCatalog`. Subsequent `lake.update()` executions decode new contract events rather than marking them as `"unknown"`.
+- **Isomorphic Runtime Portability**: The client runtime is completely decoupled from Node.js-specific globals (`Buffer`, `node:crypto`). Pagination cursor codecs use pure Web standard `TextEncoder`/`TextDecoder` and `btoa`/`atob`; HTTP stream readers accumulate `Uint8Array` buffers directly; UUIDs utilize `globalThis.crypto.randomUUID` with a fallback generator.
+- **IndexedDB $O(1)$ Keyset Pagination**: Instead of opening cursor scans at block 0 and stepping linearly via JavaScript `cursor.continue()`, `IndexeddbStorageAdapter.queryEvents` derives the exact lower/upper boundary on the composite index `by_chain_order` (`[targetKey, blockNumberKey, transactionIndex, logIndex, eventId]`) directly from `input.after`, ensuring constant-time index positioning.
+- **RPC Batch Resilience & Multi-Endpoint Independence**: HTTP 413, 422, and payload limit responses are classified as batch rejections rather than connection fatalities, disabling batching for the endpoint while allowing sequential pipelining to succeed. Range-end block headers pass `excludeEndpointIdentity: fetchedRange.endpointIdentity` to prevent a single forked node from self-validating its own block logs.
+- **Orphaned / Reorged Log Ingestion Filtering**: Logs with `removed: true` are filtered out during ingestion normalization and excluded from query results across all storage engines.
+
 
 
 ---

@@ -36,6 +36,9 @@ import {
 } from "./storage-models.js";
 
 const SCHEMA_VERSION = 1;
+const BULK_LOGS_CHUNK_SIZE = 500;
+const BULK_PARAMETERS_CHUNK_SIZE = 1000;
+const BULK_IN_CHUNK_SIZE = 1000;
 
 export class SqlStorageAdapter implements StorageAdapter {
   readonly #closeDatabase: () => Promise<void>;
@@ -283,18 +286,20 @@ export class SqlStorageAdapter implements StorageAdapter {
       const uniqueLogs = [
         ...new Map(request.logs.map((log) => [log.eventId, log])).values(),
       ];
-      const insertedEventIds =
-        uniqueLogs.length === 0
-          ? []
-          : await transaction
-              .insertInto("event_logs")
-              .values(uniqueLogs.map((log) => eventLogToRow(log)))
-              .onConflict((conflict) => conflict.column("event_id").doNothing())
-              .returning("event_id")
-              .execute();
-      const insertedEventIdSet = new Set(
-        insertedEventIds.map((row) => row.event_id),
-      );
+      const insertedEventIdSet = new Set<string>();
+      for (let i = 0; i < uniqueLogs.length; i += BULK_LOGS_CHUNK_SIZE) {
+        const chunk = uniqueLogs.slice(i, i + BULK_LOGS_CHUNK_SIZE);
+        const insertedChunk = await transaction
+          .insertInto("event_logs")
+          .values(chunk.map((log) => eventLogToRow(log)))
+          .onConflict((conflict) => conflict.column("event_id").doNothing())
+          .returning("event_id")
+          .execute();
+        for (const row of insertedChunk) {
+          insertedEventIdSet.add(row.event_id);
+        }
+      }
+
       const parameterRows = uniqueLogs
         .filter((log) => insertedEventIdSet.has(log.eventId))
         .flatMap((log) =>
@@ -309,10 +314,16 @@ export class SqlStorageAdapter implements StorageAdapter {
             target_key: log.targetKey,
           })),
         );
-      if (parameterRows.length > 0) {
+
+      for (
+        let i = 0;
+        i < parameterRows.length;
+        i += BULK_PARAMETERS_CHUNK_SIZE
+      ) {
+        const chunk = parameterRows.slice(i, i + BULK_PARAMETERS_CHUNK_SIZE);
         await transaction
           .insertInto("event_parameters")
-          .values(parameterRows)
+          .values(chunk)
           .execute();
       }
 
@@ -486,15 +497,17 @@ export class SqlStorageAdapter implements StorageAdapter {
     const rows = await query.execute();
     if (rows.length === 0) return Object.freeze([]);
 
-    const parameterRows = await this.#database
-      .selectFrom("event_parameters")
-      .selectAll()
-      .where(
-        "event_id",
-        "in",
-        rows.map((row) => row.event_id),
-      )
-      .execute();
+    const eventIds = rows.map((row) => row.event_id);
+    const parameterRows: StorageDatabaseSchema["event_parameters"][] = [];
+    for (let i = 0; i < eventIds.length; i += BULK_IN_CHUNK_SIZE) {
+      const chunk = eventIds.slice(i, i + BULK_IN_CHUNK_SIZE);
+      const chunkParams = await this.#database
+        .selectFrom("event_parameters")
+        .selectAll()
+        .where("event_id", "in", chunk)
+        .execute();
+      parameterRows.push(...chunkParams);
+    }
     const parameterRowsByEventId = new Map<
       string,
       StorageDatabaseSchema["event_parameters"][]
@@ -529,11 +542,14 @@ export class SqlStorageAdapter implements StorageAdapter {
       const eventIds = request.logs.map((log) => log.eventId);
 
       // 1. Delete old parameters for these events
-      await transaction
-        .deleteFrom("event_parameters")
-        .where("target_key", "=", request.targetKey)
-        .where("event_id", "in", eventIds)
-        .execute();
+      for (let i = 0; i < eventIds.length; i += BULK_IN_CHUNK_SIZE) {
+        const chunk = eventIds.slice(i, i + BULK_IN_CHUNK_SIZE);
+        await transaction
+          .deleteFrom("event_parameters")
+          .where("target_key", "=", request.targetKey)
+          .where("event_id", "in", chunk)
+          .execute();
+      }
 
       // 2. Update each event log row
       for (const log of request.logs) {
@@ -565,10 +581,15 @@ export class SqlStorageAdapter implements StorageAdapter {
         })),
       );
 
-      if (parameterRows.length > 0) {
+      for (
+        let i = 0;
+        i < parameterRows.length;
+        i += BULK_PARAMETERS_CHUNK_SIZE
+      ) {
+        const chunk = parameterRows.slice(i, i + BULK_PARAMETERS_CHUNK_SIZE);
         await transaction
           .insertInto("event_parameters")
-          .values(parameterRows)
+          .values(chunk)
           .execute();
       }
     });
@@ -582,7 +603,8 @@ export class SqlStorageAdapter implements StorageAdapter {
     let query = this.#database
       .selectFrom("event_logs")
       .selectAll()
-      .where("target_key", "=", input.targetKey);
+      .where("target_key", "=", input.targetKey)
+      .where("removed", "=", 0);
     if (input.blockNumber !== undefined) {
       query = query.where(
         "block_number_key",
@@ -686,15 +708,17 @@ export class SqlStorageAdapter implements StorageAdapter {
       .execute();
     if (rows.length === 0) return Object.freeze([]);
 
-    const parameterRows = await this.#database
-      .selectFrom("event_parameters")
-      .selectAll()
-      .where(
-        "event_id",
-        "in",
-        rows.map((row) => row.event_id),
-      )
-      .execute();
+    const eventIds = rows.map((row) => row.event_id);
+    const parameterRows: StorageDatabaseSchema["event_parameters"][] = [];
+    for (let i = 0; i < eventIds.length; i += BULK_IN_CHUNK_SIZE) {
+      const chunk = eventIds.slice(i, i + BULK_IN_CHUNK_SIZE);
+      const chunkParams = await this.#database
+        .selectFrom("event_parameters")
+        .selectAll()
+        .where("event_id", "in", chunk)
+        .execute();
+      parameterRows.push(...chunkParams);
+    }
     const parameterRowsByEventId = new Map<
       string,
       StorageDatabaseSchema["event_parameters"][]
@@ -835,7 +859,13 @@ export class SqlStorageAdapter implements StorageAdapter {
       .createIndex("event_parameters_lookup")
       .ifNotExists()
       .on("event_parameters")
-      .columns(["target_key", "name", "comparable_value", "is_indexed"])
+      .columns([
+        "target_key",
+        "name",
+        "comparable_value",
+        "is_indexed",
+        "event_id",
+      ])
       .execute();
     await this.#database.schema
       .createTable("sync_checkpoints")

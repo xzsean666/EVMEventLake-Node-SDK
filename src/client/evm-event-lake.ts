@@ -176,9 +176,9 @@ export class EVMEventLake {
         ...options,
         signal,
       });
-      this.#queryService.setCatalog(
-        this.#queryService.catalog.merge(newCatalog),
-      );
+      const mergedCatalog = this.#queryService.catalog.merge(newCatalog);
+      this.#queryService.setCatalog(mergedCatalog);
+      this.#updateService.setCatalog(mergedCatalog);
       return result;
     })();
 

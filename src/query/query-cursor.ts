@@ -11,6 +11,31 @@ interface QueryCursorPayload {
   readonly version: 1;
 }
 
+function stringToBase64Url(str: string): string {
+  const bytes = new TextEncoder().encode(str);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]!);
+  }
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+function base64UrlToString(base64url: string): string {
+  let base64 = base64url.replace(/-/g, "+").replace(/_/g, "/");
+  while (base64.length % 4 !== 0) {
+    base64 += "=";
+  }
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new TextDecoder().decode(bytes);
+}
+
 export function encodeQueryCursor(input: {
   readonly cursor: StoredEventQueryCursor;
   readonly order: "ascending" | "descending";
@@ -25,7 +50,7 @@ export function encodeQueryCursor(input: {
     transactionIndex: input.cursor.transactionIndex,
     version: 1,
   };
-  return Buffer.from(JSON.stringify(payload)).toString("base64url");
+  return stringToBase64Url(JSON.stringify(payload));
 }
 
 export function decodeQueryCursor(input: {
@@ -35,9 +60,7 @@ export function decodeQueryCursor(input: {
 }): StoredEventQueryCursor {
   let payload: unknown;
   try {
-    payload = JSON.parse(
-      Buffer.from(input.cursor, "base64url").toString("utf8"),
-    ) as unknown;
+    payload = JSON.parse(base64UrlToString(input.cursor)) as unknown;
   } catch (cause) {
     throw new QueryValidationError("Query cursor is invalid", { cause });
   }
