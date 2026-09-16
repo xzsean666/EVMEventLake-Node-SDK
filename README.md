@@ -261,6 +261,38 @@ if (status.syncedThroughBlock !== null) {
 
 ---
 
+## Foundation SDK Re-use (`evm-call` 底座能力复用)
+
+下游项目依赖 `@evm-event-lake/node-sdk` 时，可**直接复用底层 `evm-call` 基础设施**，无需在项目自身的 `package.json` 中重复声明或安装 `evm-call`，彻底杜绝多版本冲突与双重依赖维护：
+
+### 1. 子路径导入 (Subpath Import - 推荐 🌟)
+开箱即用支持细粒度、Tree-shaking 友好的按需引用：
+```ts
+import {
+  EvmCallClient,
+  CooldownTracker,
+  MULTICALL3_ADDRESS,
+  normalizeEvmLog,
+} from "@evm-event-lake/node-sdk/evm-call";
+
+// 创建轻量级 RPC 客户端或执行 Multicall
+const client = new EvmCallClient({
+  chainId: 8453,
+  customRpcUrls: ["https://mainnet.base.org"],
+});
+await client.init();
+```
+
+### 2. 根命名空间导入 (Root Namespace Import)
+通过根导出的 `EvmCall` 命名空间聚合访问：
+```ts
+import { EVMEventLake, EvmCall } from "@evm-event-lake/node-sdk";
+
+const tracker = new EvmCall.CooldownTracker();
+```
+
+---
+
 ## Storage Options
 
 - **SQLite**: `sqlite://events.db` or `sqlite:///var/data/events.db` (single-process / embedded Node.js).

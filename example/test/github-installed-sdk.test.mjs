@@ -7,6 +7,7 @@ import test from "node:test";
 
 import { ClientClosedError, EVMEventLake } from "@evm-event-lake/node-sdk";
 import * as packageRoot from "@evm-event-lake/node-sdk";
+import * as evmCallSubpath from "@evm-event-lake/node-sdk/evm-call";
 
 const transferAbi = [
   {
@@ -29,6 +30,11 @@ const transferTopic =
 
 test("Git-installed package supports the public lifecycle and query surface", async () => {
   assert.equal(typeof packageRoot.EVMEventLake, "function");
+  assert.equal(typeof packageRoot.EvmCall, "object");
+  assert.equal(typeof packageRoot.EvmCall.EvmCallClient, "function");
+  assert.equal(typeof evmCallSubpath.EvmCallClient, "function");
+  assert.equal(typeof evmCallSubpath.CooldownTracker, "function");
+  assert.equal(typeof evmCallSubpath.MULTICALL3_ADDRESS, "string");
   assert.equal("RpcPool" in packageRoot, false);
   assert.equal("createStorageAdapter" in packageRoot, false);
 

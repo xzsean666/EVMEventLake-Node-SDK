@@ -82,4 +82,27 @@ pnpm link /ssd0/git/evm-call
 | `EvmLog` 缺少字段或类型不匹配 | 在 `/ssd0/git/evm-call/src/domain/log.ts` 中扩展，并在 `export * from "./domain"` 中导出。 |
 | 日志切片参数需要更精细控制 | 在 `/ssd0/git/evm-call/src/execution/chunked.ts` 中增补 options 选项并暴露。 |
 | RPC Pool 冷却策略需要特殊定制 | 在 `/ssd0/git/evm-call/src/pool/` 中增加对应的策略配置项。 |
-| 缺少某个 JSON-RPC 原生方法封装 | 在 `/ssd0/git/evm-call/src/transport/` 或 client 中增加便捷调用入口。 |
+| `缺少某个 JSON-RPC 原生方法封装` | 在 `/ssd0/git/evm-call/src/transport/` 或 client 中增加便捷调用入口。 |
+
+---
+
+## 5. 下游消费项目复用规范 (Downstream Consumer Re-export)
+
+为了避免其他使用 `@evm-event-lake/node-sdk` 的项目在自身的 `package.json` 中重复声明 `evm-call`（导致维护双份 git commit hash 或在 pnpm 隔离环境下产生幽灵依赖报错），本 SDK 已完整 Re-export 底座：
+
+1. **子路径导出（首选，细粒度）**：
+   ```ts
+   import {
+     EvmCallClient,
+     CooldownTracker,
+     MULTICALL3_ADDRESS,
+     normalizeEvmLog,
+   } from "@evm-event-lake/node-sdk/evm-call";
+   ```
+2. **根命名空间导出（聚合快捷方式）**：
+   ```ts
+   import { EVMEventLake, EvmCall } from "@evm-event-lake/node-sdk";
+   ```
+3. **维护原则**：
+   - 下游项目严禁在自身 `package.json` 单独引入 `evm-call`，统一通过 SDK 锁定底层版本；
+   - 保持 SDK 根路径顶层符号干净，不污染内部实现，防止 `RpcPool` 等同名类冲突。

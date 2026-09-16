@@ -1,5 +1,6 @@
 import {
   EVMEventLake,
+  EvmCall,
   type EVMEventLakeOptions,
   type EventQuery,
   type EventRecord,
@@ -8,6 +9,11 @@ import {
   type UpdateProgressCallback,
   type UpdateResult,
 } from "@evm-event-lake/node-sdk";
+import {
+  CooldownTracker,
+  EvmCallClient,
+  MULTICALL3_ADDRESS,
+} from "@evm-event-lake/node-sdk/evm-call";
 
 const transferAbi = [
   {
@@ -59,6 +65,10 @@ async function exercisePublicTypes(): Promise<void> {
     void status;
     void update;
     void first;
+    const tracker: CooldownTracker = new EvmCall.CooldownTracker();
+    void tracker;
+    void EvmCallClient;
+    void MULTICALL3_ADDRESS;
   } finally {
     await eventLake.close();
   }

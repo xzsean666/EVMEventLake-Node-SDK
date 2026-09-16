@@ -108,6 +108,20 @@ The implemented repository must contain standard Node package metadata with:
 - Before 1.0, breaking changes require release notes and a minor version bump.
 - Database migrations are forward-only during normal startup.
 
+### 5.4 Foundation SDK Re-Export (`evm-call`)
+
+To prevent downstream consumer projects from having to declare duplicate Git dependency references or suffering from pnpm phantom dependency restrictions, the SDK re-exports its underlying EVM foundation SDK (`evm-call`):
+
+1. **Subpath Export**: Registered under `"./evm-call"` in `package.json#exports`. Consumers can import all public symbols, utilities, and classes directly via:
+   ```ts
+   import { EvmCallClient, CooldownTracker, MULTICALL3_ADDRESS } from "@evm-event-lake/node-sdk/evm-call";
+   ```
+2. **Namespace Export**: Exposed as `EvmCall` on the root package entry point:
+   ```ts
+   import { EVMEventLake, EvmCall } from "@evm-event-lake/node-sdk";
+   ```
+3. **Namespace Isolation**: Top-level root exports do not leak internal/colliding symbols such as `RpcPool`, preserving strict abstraction boundaries.
+
 ## 6. Public Lifecycle
 
 ### 6.1 Create

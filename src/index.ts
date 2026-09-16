@@ -35,3 +35,4 @@ export type {
   UpdateResult,
   UpdateRewindResult,
 } from "./synchronization/synchronization-result.js";
+export * as EvmCall from "./evm-call.js";

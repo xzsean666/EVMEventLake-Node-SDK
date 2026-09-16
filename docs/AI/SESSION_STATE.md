@@ -10,38 +10,26 @@ Last updated: 2026-09-16
 ---
 
 ## 2. 当前 Task
-**TASK-011: Comprehensive Audit Hardening & Security, Performance, and Correctness Optimization**
-- **SQLite 参数变量上限防护 (SQL Variable Chunking)**:
-  - 在 `SqlStorageAdapter` 中针对 SQLite 单次查询最大参数量限制（32,766）实施分批分块写入：定义 `BULK_LOGS_CHUNK_SIZE = 500`、`BULK_PARAMETERS_CHUNK_SIZE = 1000` 以及 `BULK_IN_CHUNK_SIZE = 1000`。
-  - 在 `commitRange`、`updateDecodedLogs`、`getLogsForRedecode` 及 `queryEvents` 中，参数行与日志行均在单一原子事务内透明分块，并在复合索引 `event_parameters_lookup` 中引入 `event_id` 覆盖索引列，保证单次同步 2,500+ 日志与 10,000+ 参数时不发生 `RangeError: too many SQL variables` 崩溃。
-- **代理合约历史日志重解码状态全同步 (Redecode Catalog Sync)**:
-  - 修复 `EVMEventLake.redecode()` 仅更新 `queryService` 而未同步 `updateService` 目录的缺陷：在 `UpdateService` 中开放 `catalog` 读取与 `setCatalog` 更新接口。
-  - 当调用方升级 ABI 执行 `lake.redecode()` 后，查询服务与同步服务同时升级至合并后的最新 ABI 目录，确保后续 `lake.update()` 增量拉取的升级事件能被立即正确解码，不再沦为 `"unknown"`。
-- **浏览器与边缘同构运行时彻底去 Node.js 依赖 (Zero Node Globals Portability)**:
-  - 在 `src/query/query-cursor.ts` 中完全移除 `Buffer.from(..., "base64url")`，改用 W3C 标准 `TextEncoder`/`TextDecoder` 以及 `btoa`/`atob` 纯 JavaScript 实现确定性 base64url 编解码。
-  - 在 `src/rpc/evm-rpc-client.ts` 的流式响应截断 `readBoundedResponseText` 中移除 `Buffer.concat`，改用纯 `Uint8Array` 合并与 `TextDecoder` 解码。
-  - 在 `src/synchronization/update-service.ts` 中解耦 Node `node:crypto` 的 `randomUUID`，优先使用标准的 `globalThis.crypto.randomUUID()`，并提供兼容回退实现。
-- **IndexedDB 游标分页 $O(1)$ 索引定位 (Direct Keyset Pagination Bounds)**:
-  - 针对 `IndexeddbStorageAdapter.queryEvents` 进行架构级性能重构：消除以往携带 `after` 游标时从区块 0 开始通过 JS `cursor.continue()` 线性扫描的性能瓶颈。
-  - 基于复合索引 `by_chain_order (targetKey, blockNumberKey, transactionIndex, logIndex, eventId)`，直接将 `input.after` 解析并动态绑定为 `IDBKeyRange.bound(lowerBound, upperBound, lowerOpen, upperOpen)` 的开闭区间，使底层存储引擎以 $O(1)$ 复杂度直接跳转至目标游标位置。
-- **查询参数校验与空值防御加固 (Query Validation Hardening)**:
-  - 修复 JavaScript 中 `BigInt("")` 和 `BigInt("   ")` 静默求值为 `0n` 的类型隐患：在 `normalizeIndexedValue` 与 `normalizeUnindexedValue` 中强制要求整数字符串非空且正则匹配 `/^-?\d+$/`。
-  - 修复动态 `bytes` 检索时前缀为 `0x` 的非法十六进制字符串静默穿透为 ASCII 字节哈希的问题：只要以 `0x` 开头即严格校验十六进制合法性，非法输入立即抛出类型明确的 `QueryValidationError`。
-- **RPC 批量自适应降级分类与多端点独立校验 (RPC Batching & Multi-Endpoint Independence)**:
-  - 在 `rpc-error-classifier.ts` 的 `isRpcBatchRejection` 中扩充对真实网关报错的识别：覆盖 HTTP 413 (Payload Too Large)、HTTP 422 (Unprocessable Entity) 及包含 `"payload too large"` 等常见限制。
-  - 遇到批处理限制时，仅标记该端点不支持批处理并自适应降级为顺序管道拉取，不再对健康的端点施加长冷却惩罚。
-  - 在 `RpcPool` 中支持 `excludeEndpointIdentity` 过滤参数；在 `UpdateService` 中获取检查点区块头时，强制排除产生该段日志的同名端点（在存在多个端点时），确保检查点区块头来自独立的 RPC 节点，彻底杜绝单节点分叉自验证欺骗。
-- **重组孤儿日志过滤 (Orphaned Log Filtering)**:
-  - 在 `update-service.ts` 的 `normalizeLogs` 中显式过滤 `log.removed === true` 的链上孤儿日志。
-  - 在 `SqlStorageAdapter.queryEvents` 和 `IndexeddbStorageAdapter.queryEvents` 中，显式添加 `removed = 0` 过滤逻辑，保证已重组或失效的日志不泄漏至查询结果。
-- **测试与文档对齐**:
-  - 新建 `tests/unit/audit-hardening.test.ts` 专项测试套件，8 个用例全面覆盖 SQL 2,500+ 大批量写入、无 Buffer 游标编解码、批量 413 降级、空字符串参数报错、redecode 目录同步、独立端点排除路由、removed 日志过滤及 IndexedDB $O(1)$ 游标过滤。
-  - 升级 `docs/SPEC.md` 第 17 节与 `docs/AI/ARCHITECTURE.md` 第 11.1 节，沉淀分批写入、两端目录同步与浏览器同构运行等设计规范。
+**TASK-012: Subpath and Namespace Re-Export for evm-call Foundation SDK**
+- **创建子路径模块 `src/evm-call.ts`**:
+  - 全量重新导出底层底座 `export * from "evm-call"`。
+  - 构建生成 `dist/evm-call.js` 与 `dist/evm-call.d.ts`。
+- **配置 `package.json` Subpath Exports**:
+  - 注册 `"./evm-call": { "types": "./dist/evm-call.d.ts", "import": "./dist/evm-call.js" }`。
+- **根路径聚合导出 `EvmCall` 命名空间**:
+  - 在 `src/index.ts` 中暴露 `export * as EvmCall from "./evm-call.js"`。
+  - 确保根命名空间不泄漏 `RpcPool` 等冲突符号，保持 EventLake 原有公共 API 抽象隔离。
+- **全链路用例与下游工程验证**:
+  - 编写 `tests/unit/evm-call-export.test.ts` 专项单测；
+  - 增强 `tests/unit/public-api.test.ts`；
+  - 扩展 `example/typecheck.ts` 与 `example/test/github-installed-sdk.test.mjs`，验证独立 Git 安装与消费工程中的开箱即用体验。
+- **文档与规范同步**:
+  - 更新 `README.md`、`docs/SPEC.md`、`docs/AI/ARCHITECTURE.md` 与 `docs/AI/CONTEXT_EVM_CALL.md`。
 
 ---
 
 ## 3. 当前状态
-**DONE** (All tasks TASK-000 through TASK-011 are completed and verified)
+**REVIEW** (All implementation and unit tests complete; preparing git commit and git-install verification)
 
 ---
 

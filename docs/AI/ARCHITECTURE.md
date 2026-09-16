@@ -660,7 +660,9 @@ Query behavior is intentionally limited to persisted facts. There is no hidden R
 - **RPC Batch Resilience & Multi-Endpoint Independence**: HTTP 413, 422, and payload limit responses are classified as batch rejections rather than connection fatalities, disabling batching for the endpoint while allowing sequential pipelining to succeed. Range-end block headers pass `excludeEndpointIdentity: fetchedRange.endpointIdentity` to prevent a single forked node from self-validating its own block logs.
 - **Orphaned / Reorged Log Ingestion Filtering**: Logs with `removed: true` are filtered out during ingestion normalization and excluded from query results across all storage engines.
 
-
+### 11.2 Foundation SDK Re-export Architecture (`evm-call`)
+- **Subpath Decoupling**: Rather than dumping all `evm-call` exports onto the top-level SDK index, `src/evm-call.ts` is exported via the `"./evm-call"` package subpath mapping (`@evm-event-lake/node-sdk/evm-call`). This keeps the root SDK surface (`EVMEventLake`, `EventQuery`, typed errors) clean and isolated from foundation symbols like `RpcPool` or `JsonRpcBatchExecutor`.
+- **Zero Duplicate Dependencies**: Downstream consumer applications (which often need both event indexing and direct contract/RPC reading) import directly from `@evm-event-lake/node-sdk/evm-call` or use the root `EvmCall` namespace without declaring a second `evm-call` Git dependency in their own `package.json`. This eliminates pnpm phantom dependency issues, Git commit drift, and dual-package bundling hazards.
 
 ---
 
