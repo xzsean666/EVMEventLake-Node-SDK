@@ -13,6 +13,9 @@
 | [`05-observability-and-progress.ts`](./05-observability-and-progress.ts) | **监控与生命周期阶段追踪**      | 自定义结构化 `SdkLogger`、`onProgress` 阶段回调（节点校验、自适应拆分、落库原子提交、重组回滚）、`UpdateResult` 详尽统计     | `pnpm run example:observability` |
 | [`06-erc721-nft-tracker.ts`](./06-erc721-nft-tracker.ts)                 | **NFT (ERC-721) 追踪**          | ERC-721 Indexed TokenId 特性、零地址判定 NFT 铸造（Mint）、单 Token 历史流转追溯、按买家地址聚合                             | `pnpm run example:nft`           |
 | [`07-browser-indexeddb/`](./07-browser-indexeddb/)                       | **浏览器前端与 dApp 集成**      | 纯前端 `idb://` 模式、零 Node 原生依赖绑定、浏览器 IndexedDB 持久化缓存、离线事件检索、Vite 构建集成                         | 详见目录内说明                   |
+| [`08-event-enrichment-hook.ts`](./08-event-enrichment-hook.ts)           | **业务数据富化挂钩**            | `enrichEvent` 领域数据增强计算、`additional_data` 三端持久化、复杂类型支持、查询检索与 `update` 动态覆写                     | `pnpm run example:enrichment`    |
+| [`09-native-topic-filters.ts`](./09-native-topic-filters.ts)             | **原生 getLogs Topic 过滤**     | `topic0`..`topic3` 精准过滤、地址自动 32 字节补齐、`bigint`/`number`/`boolean`/`bytes32` 支持、通配符与逻辑 OR 过滤          | `pnpm run example:topics`        |
+| [`10-evm-call-foundation-reuse.ts`](./10-evm-call-foundation-reuse.ts)   | **底座能力复用 (evm-call)**     | 命名空间与子路径导出、`EvmCallClient` 直接复用、内置节点列表、零额外依赖安装                                                 | `pnpm run example:evm-call`      |
 
 ---
 
@@ -112,4 +115,48 @@ const status = await eventLake.getSyncStatus();
 console.log(`当前起始区块: ${status.startBlock}`);
 console.log(`下一次待同步区块: ${status.nextBlock}`);
 console.log(`已成功同步并确认的最高区块: ${status.syncedThroughBlock}`);
+```
+
+### 6. 自定义事件业务富化 (enrichEvent & additionalData)
+
+```ts
+const eventLake = await EVMEventLake.create({
+  // ...
+  enrichEvent: (context) => ({
+    tier: (context.arguments as any)?.value > 1000n ? "whale" : "normal",
+    syncedAt: new Date().toISOString(),
+  }),
+});
+
+// 查询时直接读取业务元数据
+const page = await eventLake.events.findMany({ limit: 10 });
+console.log(page.items[0].additionalData); // { tier: "whale", syncedAt: "..." }
+```
+
+### 7. 原生 getLogs Topic 过滤 (topic0..topic3)
+
+```ts
+// 仅拉取命中特定收款人与特定 tokenId 的事件，节约网络带宽并绕过 RPC 日志上限
+await eventLake.update({
+  topic2: "0xRecipientAddress", // 20 字节地址自动补齐为 32 字节
+  topic3: 12345n, // 原生 bigint 自动转换为 32 字节十六进制
+});
+```
+
+### 8. 底座能力复用 (无需额外安装 evm-call)
+
+```ts
+import {
+  createEvmCallClient,
+  BUILTIN_BASE_RPCS,
+} from "@evm-event-lake/node-sdk/evm-call";
+
+const client = createEvmCallClient({
+  chainId: 8453,
+  customRpcUrls: [BUILTIN_BASE_RPCS[0]?.url ?? "https://mainnet.base.org"],
+});
+await client.init();
+const latest = await client.findLatestBlockNumber();
+console.log("Base latest block:", latest.blockNumber);
+client.close();
 ```

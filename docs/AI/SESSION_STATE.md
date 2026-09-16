@@ -99,9 +99,15 @@ Last updated: 2026-09-16
 - **原生 getLogs Topic Filters 过滤支持 (TASK-014)**:
   - 允许在创建 SDK 时配置 `topics` 或 `topic0..topic3`，或在 `update()` 时动态覆写；
   - 支持标准 JSON-RPC 数组 notation 及命名对象 `{ topic0, topic1, topic2, topic3 }`；
+  - 支持全类型 TopicFilterPrimitive（`Hex`, 20-byte `Address`, `bigint`, `number`, `boolean`, `bytes32`）；
   - 支持嵌套数组逻辑 OR 过滤（如 `[[TRANSFER_TOPIC, APPROVAL_TOPIC], null]`）；
   - 全流程下发至 `RpcPool.fetchLogs` 及 `fetchLogsBatch` 的 `eth_getLogs` RPC 调用；
   - `normalizeLogs` 增加防御性 topic 匹配检查，杜绝异常 RPC 节点返回不匹配日志。
+- **全新示例代码库丰富**:
+  - 新增 `examples/08-event-enrichment-hook.ts`（业务富化挂钩与持久化 additionalData）；
+  - 新增 `examples/09-native-topic-filters.ts`（原生 getLogs Topic 过滤、地址自动补齐、多类型过滤）；
+  - 新增 `examples/10-evm-call-foundation-reuse.ts`（底座 evm-call 命名空间与子路径直接复用）；
+  - 新增快捷命令：`pnpm run example:enrichment`、`pnpm run example:topics`、`pnpm run example:evm-call`。
 
 ---
 

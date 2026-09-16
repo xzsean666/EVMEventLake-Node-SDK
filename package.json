@@ -64,6 +64,9 @@
     "example:postgres": "node --experimental-strip-types examples/04-postgresql-storage.ts",
     "example:observability": "node --experimental-strip-types examples/05-observability-and-progress.ts",
     "example:nft": "node --experimental-strip-types examples/06-erc721-nft-tracker.ts",
+    "example:enrichment": "node --experimental-strip-types examples/08-event-enrichment-hook.ts",
+    "example:topics": "node --experimental-strip-types examples/09-native-topic-filters.ts",
+    "example:evm-call": "node --experimental-strip-types examples/10-evm-call-foundation-reuse.ts",
     "verify": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build"
   },
   "dependencies": {
