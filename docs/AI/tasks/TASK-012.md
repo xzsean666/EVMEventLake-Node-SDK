@@ -85,4 +85,4 @@ pnpm run verify
 
 ## 8. Status
 
-IN_PROGRESS
+DONE

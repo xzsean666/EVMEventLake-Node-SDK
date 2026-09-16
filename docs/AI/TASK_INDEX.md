@@ -37,13 +37,16 @@ TODO -> IN_PROGRESS -> REVIEW -> DONE
 | **`TASK-009`** | RPC Batch Requesting & Adaptive Pipelining | **DONE** | `TASK-001` | Implement JSON-RPC batching and request pipelining to accelerate large block interval sync. | [`TASK-009.md`](tasks/TASK-009.md) |
 | **`TASK-010`** | Indexed Dynamic Values & Parameter Search | **DONE** | `TASK-000` | Transparent topic hashing for dynamic string/bytes and accelerated non-indexed query indices. | [`TASK-010.md`](tasks/TASK-010.md) |
 | **`TASK-011`** | Comprehensive Audit Hardening & Security, Performance, and Correctness Optimization | **DONE** | `TASK-010` | SQL variable chunking, redecode catalog sync, browser Buffer decoupling, IndexedDB O(1) keyset pagination, query validation hardening, and RPC batch resilience. | [`TASK-011.md`](tasks/TASK-011.md) |
-| **`TASK-012`** | Subpath and Namespace Re-Export for evm-call Foundation SDK | **IN_PROGRESS** | `TASK-011` | Expose `@evm-event-lake/node-sdk/evm-call` and `EvmCall` namespace so downstream projects can use foundation utilities without duplicate dependency declarations. | [`TASK-012.md`](tasks/TASK-012.md) |
+| **`TASK-012`** | Subpath and Namespace Re-Export for evm-call Foundation SDK | **DONE** | `TASK-011` | Expose `@evm-event-lake/node-sdk/evm-call` and `EvmCall` namespace so downstream projects can use foundation utilities without duplicate dependency declarations. | [`TASK-012.md`](tasks/TASK-012.md) |
 
 ---
 
 ## 3. Execution Priority & Next Up
 
-1. **Active Task**: **TASK-012: Subpath and Namespace Re-Export for evm-call Foundation SDK**.
+1. **Status**: **ALL TASKS COMPLETE (TASK-000 through TASK-012)**.
+   - All foundational features, audit remediations, optimizations, foundation re-exports, and parity tests complete across SQLite, PostgreSQL, and IndexedDB.
+   - Downstream consumers can directly access `@evm-event-lake/node-sdk/evm-call` and `EvmCall`.
+   - Ready for production release tag `v0.1.0`.
 
 
 ---

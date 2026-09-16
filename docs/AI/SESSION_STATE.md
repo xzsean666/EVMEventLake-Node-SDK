@@ -29,7 +29,7 @@ Last updated: 2026-09-16
 ---
 
 ## 3. 当前状态
-**REVIEW** (All implementation and unit tests complete; preparing git commit and git-install verification)
+**DONE** (All tasks TASK-000 through TASK-012 are completed and verified)
 
 ---
 
@@ -46,24 +46,23 @@ Last updated: 2026-09-16
 10. **`TASK-009`**: RPC Batch Requesting & Adaptive Pipelining (`DONE`)
 11. **`TASK-010`**: Indexed Dynamic Values & Parameter Search (`DONE`)
 12. **`TASK-011`**: Comprehensive Audit Hardening & Security, Performance, and Correctness Optimization (`DONE`)
+13. **`TASK-012`**: Subpath and Namespace Re-Export for evm-call Foundation SDK (`DONE`)
 
 ---
 
 ## 5. 本次 Task 修改过的文件
-- `src/storage/sql-storage-adapter.ts`
-- `src/synchronization/update-service.ts`
-- `src/client/evm-event-lake.ts`
-- `src/query/query-cursor.ts`
-- `src/rpc/evm-rpc-client.ts`
-- `src/storage/indexeddb/indexeddb-storage-adapter.ts`
-- `src/query/event-query-service.ts`
-- `src/rpc/rpc-error-classifier.ts`
-- `src/rpc/rpc-pool.ts`
-- `eslint.config.js`
-- `tests/unit/audit-hardening.test.ts` (新建)
+- `src/evm-call.ts` (新建)
+- `src/index.ts`
+- `package.json`
+- `tests/unit/evm-call-export.test.ts` (新建)
+- `tests/unit/public-api.test.ts`
+- `example/typecheck.ts`
+- `example/test/github-installed-sdk.test.mjs`
+- `README.md`
 - `docs/SPEC.md`
 - `docs/AI/ARCHITECTURE.md`
-- `docs/AI/tasks/TASK-011.md`
+- `docs/AI/CONTEXT_EVM_CALL.md`
+- `docs/AI/tasks/TASK-012.md` (新建)
 - `docs/AI/TASK_INDEX.md`
 - `docs/AI/SESSION_STATE.md`
 
@@ -73,33 +72,32 @@ Last updated: 2026-09-16
 - `pnpm run format:check`：全部文件格式匹配 Prettier（Exit code 0）。
 - `pnpm run lint`：0 错误，0 警告（Exit code 0）。
 - `pnpm run typecheck`：通过（Exit code 0）。
-- `pnpm test tests/unit/audit-hardening.test.ts`：8 个审计专项单测全部通过（Exit code 0）。
-- `pnpm run test:storage:sqlite`：7 个存储契约测试全部通过（Exit code 0）。
-- `pnpm run test:storage:postgresql`：7 个存储契约测试全部通过（Exit code 0）。
-- `pnpm run test:storage:indexeddb`：12 个存储与查询契约测试全部通过（Exit code 0）。
-- `pnpm run test`：30 个测试套件，140 个测试全部通过（2 个外部真实环境测试跳过）（Exit code 0）。
-- `pnpm run build`：编译成功生成 `dist/`（Exit code 0）。
+- `pnpm test tests/unit/evm-call-export.test.ts`：专项导出单测通过（Exit code 0）。
+- `pnpm run test`：31 个测试套件，143 个测试全部通过（2 个外部真实环境测试跳过）（Exit code 0）。
+- `pnpm run build`：编译成功生成 `dist/index.js`, `dist/index.d.ts`, `dist/evm-call.js`, `dist/evm-call.d.ts`（Exit code 0）。
+- `node scripts/test-git-install.mjs`：独立临时消费工程克隆并安装 Git 提交产物，验证通过 `@evm-event-lake/node-sdk/evm-call` 与 `EvmCall` 的解构使用与类型推断（Exit code 0）。
 - `pnpm run verify`：流水线五步全量验证完整通过（Exit code 0）。
 
 ---
 
 ## 7. 未解决问题
-无。全部审计项均已实施加固并通过多维度严苛测试。
+无。已完全满足下游项目零重复声明、直接复用底层 `evm-call` 基础设施的诉求。
 
 ---
 
 ## 8. 风险和假设
-- 大规模写入时的分批写入保持在同一原子事务内执行，任一批次失败均完整回滚，保证数据库持久化状态的一致性与完整性。
-- IndexedDB 游标分页基于键集上下界计算，严格匹配 `ascending` 与 `descending` 规则，无漏检或重复扫描风险。
+- 下游使用者若需要精细化控制 Tree-shaking，推荐使用子路径 `@evm-event-lake/node-sdk/evm-call`。
+- 根导出保留 `EvmCall` 命名空间，顶层绝不平铺透出 `RpcPool`，确保核心 EventLake SDK 的 API 独立性与清晰度。
 
 ---
 
 ## 9. 最新维护记录
-- **全项目安全与性能审计与生产就绪加固 (Production Readiness Audit Hardening)**:
-  - 彻底消除了底层驱动参数溢出、状态不同步、Node 专有 API 泄漏、空值误求值及全表遍历等安全和性能隐患。
-  - 项目保持 100% 契约对齐与测试通过率（30 个测试套件，140 个测试）。
+- **evm-call 底座子路径导出与命名空间复用 (TASK-012)**:
+  - 新增 `src/evm-call.ts` 并注册 package.json `"./evm-call"` 子路径导出；
+  - 根路径导出 `EvmCall` 命名空间；
+  - 外部独立安装工程验证通过，下游完全无需安装或声明 `evm-call`。
 
 ---
 
 ## 10. 下一步计划
-- 项目全部 12 个任务（TASK-000 至 TASK-011）均已高质量完成并经受全面验证。已完全具备正式生产发布及 Git Tag 打标发布条件。
+- 保持准备就绪状态。待用户确认后可打上 Git Tag 发布。
