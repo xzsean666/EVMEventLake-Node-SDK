@@ -257,6 +257,7 @@ function createTransferLog(
   const to = "0x0000000000000000000000000000000000000002";
   return {
     abiFingerprint: catalog.abiFingerprint,
+    additionalData: null,
     blockHash,
     blockNumber,
     contractAddress,
@@ -324,6 +325,7 @@ function createUserRegisteredLog(
   const usernameHash = keccak256(stringToBytes(username)).toLowerCase() as Hex;
   return {
     abiFingerprint: catalog.abiFingerprint,
+    additionalData: null,
     blockHash,
     blockNumber,
     contractAddress,

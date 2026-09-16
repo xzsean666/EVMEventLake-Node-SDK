@@ -246,6 +246,56 @@ if (status.syncedThroughBlock !== null) {
 }
 ```
 
+### 7. Custom Event Enrichment & Additional Data (`enrichEvent` & `additionalData`)
+
+Pass an asynchronous or synchronous `enrichEvent` function at SDK initialization or per `update()` call. The enricher receives the full raw and decoded event context (`EventEnrichmentContext`), and its returned JSON object is persistently saved in the database (`additional_data`) across SQLite, PostgreSQL, and IndexedDB, available on `record.additionalData`:
+
+```ts
+const lake = await EVMEventLake.create({
+  // ... target options
+  enrichEvent: async (event) => {
+    // Access decoded arguments, eventName, txHash, blockNumber, etc.
+    return {
+      category: "defi",
+      syncedAt: new Date().toISOString(),
+      tx: event.transactionHash,
+    };
+  },
+});
+
+await lake.update();
+
+// Query returns both decoded arguments and persistent additionalData
+const record = await lake.events.findFirst({ where: { eventName: "Transfer" } });
+console.log(record?.arguments);      // Decoded ABI parameters
+console.log(record?.additionalData); // { category: "defi", syncedAt: "...", tx: "0x..." }
+```
+
+### 8. Native getLogs Topic Filtering (原生 getLogs topic0~topic3 过滤)
+
+Filter logs directly at the EVM JSON-RPC node layer to drastically reduce network bandwidth and avoid RPC log limit errors. Supports `Hex` (32-byte topics & 20-byte addresses), `bigint`, `number`, `boolean`, logical OR arrays, and wildcard omissions:
+
+```ts
+// A. Set default topic filter on instance creation (omit topic0 to sync any event):
+const lake = await EVMEventLake.create({
+  // ... target options
+  // Target only specific indexed topics; omitted topics (e.g. topic0) become wildcards:
+  topic1: "0x1111111111111111111111111111111111111111", // 20-byte addresses automatically padded to 32 bytes!
+  topic3: 12345n,                                       // Native bigint (e.g. ERC721 tokenId) encoded to 32-byte hex!
+});
+
+// B. Or override per update() call using array or object format:
+await lake.update({
+  // Standard JSON-RPC array format with logical OR, numbers, booleans, and wildcards:
+  topics: [
+    ["0xddf252ad...", "0x8c5be1e5..."], // topic0: Transfer OR Approval
+    null,                               // topic1: Wildcard (any sender)
+    "0x2222222222222222222222222222222222222222", // topic2: Specific recipient
+    42,                                 // topic3: Safe number encoded to 32 bytes
+  ],
+});
+```
+
 ---
 
 ## Public API Reference

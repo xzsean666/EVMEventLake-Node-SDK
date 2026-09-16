@@ -83,6 +83,7 @@ describe("Audit Hardening & Remediations (TASK-011)", () => {
         const transactionHash: Hex = `0x${"bb".repeat(30)}${hexIndex}`;
         logs.push({
           abiFingerprint: "test-fp",
+          additionalData: null,
           blockHash,
           blockNumber: 100n + BigInt(Math.floor(i / 10)),
           contractAddress: "0x0000000000000000000000000000000000000001",
@@ -635,6 +636,7 @@ describe("Audit Hardening & Remediations (TASK-011)", () => {
       const logs: StoredEventLog[] = [
         {
           abiFingerprint: "test-fp",
+          additionalData: null,
           blockHash: hash1,
           blockNumber: 1n,
           contractAddress: "0x0000000000000000000000000000000000000001",
@@ -654,6 +656,7 @@ describe("Audit Hardening & Remediations (TASK-011)", () => {
         },
         {
           abiFingerprint: "test-fp",
+          additionalData: null,
           blockHash: hash2,
           blockNumber: 2n,
           contractAddress: "0x0000000000000000000000000000000000000001",
@@ -673,6 +676,7 @@ describe("Audit Hardening & Remediations (TASK-011)", () => {
         },
         {
           abiFingerprint: "test-fp",
+          additionalData: null,
           blockHash: hash3,
           blockNumber: 3n,
           contractAddress: "0x0000000000000000000000000000000000000001",

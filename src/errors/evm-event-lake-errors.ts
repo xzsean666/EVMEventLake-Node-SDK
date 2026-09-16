@@ -3,6 +3,7 @@ export type EVMEventLakeErrorCode =
   | "CLIENT_CLOSED"
   | "CONFIGURATION_VALIDATION_ERROR"
   | "DECODED_VALUE_CODEC_ERROR"
+  | "EVENT_ENRICHMENT_ERROR"
   | "NO_VALID_RPC_ENDPOINT"
   | "OPERATION_CANCELLED"
   | "QUERY_VALIDATION_ERROR"
@@ -141,5 +142,11 @@ export class ReorgDepthExceededError extends EVMEventLakeError {
 export class OperationCancelledError extends EVMEventLakeError {
   public constructor(message: string, options?: EVMEventLakeErrorOptions) {
     super("OPERATION_CANCELLED", message, options);
+  }
+}
+
+export class EventEnrichmentError extends EVMEventLakeError {
+  public constructor(message: string, options?: EVMEventLakeErrorOptions) {
+    super("EVENT_ENRICHMENT_ERROR", message, options);
   }
 }

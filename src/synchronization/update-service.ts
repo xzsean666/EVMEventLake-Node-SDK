@@ -11,17 +11,28 @@ function generateUniversalUUID(): string {
   });
 }
 
-import { encodeDecodedValue } from "../abi/decoded-value-codec.js";
+import {
+  decodeDecodedValue,
+  encodeDecodedValue,
+} from "../abi/decoded-value-codec.js";
 import { decodeRawEventLog } from "../abi/event-decoder.js";
 import type { EventCatalog } from "../abi/event-catalog.js";
 import type {
+  EventEnricher,
+  EventEnrichmentContext,
   NormalizedRpcPolicy,
+  NormalizedRpcTopics,
   NormalizedSynchronizationPolicy,
 } from "../configuration/sdk-options.js";
-import { normalizeBlockNumber } from "../configuration/validate-sdk-options.js";
+import {
+  matchesTopicFilter,
+  normalizeBlockNumber,
+  normalizeTopicsFilter,
+} from "../configuration/validate-sdk-options.js";
 import type { ContractTarget } from "../contract-target/contract-target.js";
 import {
   ConfigurationValidationError,
+  EventEnrichmentError,
   OperationCancelledError,
   StorageConsistencyError,
   SynchronizationFailedError,
@@ -76,6 +87,7 @@ export interface UpdateServiceDependencies {
 export class UpdateService {
   #catalog: EventCatalog;
   readonly #createOwnerToken: () => string;
+  readonly #enrichEvent: EventEnricher | undefined;
   readonly #logger: SdkLogger | undefined;
   readonly #now: () => number;
   readonly #onProgress: UpdateProgressCallback | undefined;
@@ -84,10 +96,12 @@ export class UpdateService {
   readonly #storage: StorageAdapter;
   readonly #synchronizationPolicy: NormalizedSynchronizationPolicy;
   readonly #target: ContractTarget;
+  readonly #topics: NormalizedRpcTopics | undefined;
 
   public constructor(input: {
     readonly catalog: EventCatalog;
     readonly dependencies?: UpdateServiceDependencies;
+    readonly enrichEvent?: EventEnricher;
     readonly logger?: SdkLogger;
     readonly onProgress?: UpdateProgressCallback;
     readonly rpc: UpdateRpcClient;
@@ -95,10 +109,12 @@ export class UpdateService {
     readonly storage: StorageAdapter;
     readonly synchronizationPolicy: NormalizedSynchronizationPolicy;
     readonly target: ContractTarget;
+    readonly topics?: NormalizedRpcTopics | undefined;
   }) {
     this.#catalog = input.catalog;
     this.#createOwnerToken =
       input.dependencies?.createOwnerToken ?? generateUniversalUUID;
+    this.#enrichEvent = input.enrichEvent;
     this.#logger = input.logger;
     this.#now = input.dependencies?.now ?? Date.now;
     this.#onProgress = input.onProgress;
@@ -107,6 +123,7 @@ export class UpdateService {
     this.#storage = input.storage;
     this.#synchronizationPolicy = input.synchronizationPolicy;
     this.#target = input.target;
+    this.#topics = input.topics;
   }
 
   public get catalog(): EventCatalog {
@@ -123,6 +140,24 @@ export class UpdateService {
         "Synchronization update was cancelled before start",
       );
     }
+    if (
+      options.enrichEvent !== undefined &&
+      typeof options.enrichEvent !== "function"
+    ) {
+      throw new ConfigurationValidationError(
+        "update.enrichEvent must be a function",
+      );
+    }
+    const enricher = options.enrichEvent ?? this.#enrichEvent;
+    const hasExplicitTopics =
+      options.topics !== undefined ||
+      options.topic0 !== undefined ||
+      options.topic1 !== undefined ||
+      options.topic2 !== undefined ||
+      options.topic3 !== undefined;
+    const resolvedTopics = hasExplicitTopics
+      ? normalizeTopicsFilter(options.topics, options)
+      : this.#topics;
     const startedAt = this.#now();
     const blockRange = normalizeBlockRange(
       options.blockRange,
@@ -251,6 +286,7 @@ export class UpdateService {
             fromBlock: range.fromBlock.toString(),
             targetKey: this.#target.targetKey,
             toBlock: range.toBlock.toString(),
+            ...(resolvedTopics !== undefined ? { topics: resolvedTopics } : {}),
           };
           emitProgressSafely(this.#onProgress, {
             context,
@@ -286,6 +322,7 @@ export class UpdateService {
           });
         },
         rpc: this.#rpc,
+        topics: resolvedTopics,
       });
       let committedRanges = 0;
       let decodeFailedLogs = 0;
@@ -331,10 +368,12 @@ export class UpdateService {
             this.#target.contractAddress,
             fetchedRange.range.fromBlock,
             fetchedRange.range.toBlock,
+            resolvedTopics,
           );
           fetchedLogs += logs.length;
 
-          const storedEventLogs = logs.map((log) => {
+          const storedEventLogs: StoredEventLog[] = [];
+          for (const log of logs) {
             const storedLog = createStoredEventLog(
               log,
               this.#target.targetKey,
@@ -344,8 +383,62 @@ export class UpdateService {
             if (storedLog.decodeStatus === "unknown") unknownLogs += 1;
             if (storedLog.decodeStatus === "decode_failed")
               decodeFailedLogs += 1;
-            return storedLog;
-          });
+
+            let additionalData: string | null = null;
+            if (enricher !== undefined) {
+              const enrichmentContext: EventEnrichmentContext = Object.freeze({
+                abiFingerprint: storedLog.abiFingerprint,
+                arguments:
+                  storedLog.decodedArguments === null
+                    ? null
+                    : decodeDecodedValue(storedLog.decodedArguments),
+                blockHash: storedLog.blockHash,
+                blockNumber: storedLog.blockNumber,
+                chainId: this.#target.chainId,
+                contractAddress: storedLog.contractAddress,
+                data: storedLog.data,
+                decodeStatus: storedLog.decodeStatus,
+                eventId: storedLog.eventId,
+                eventName: storedLog.eventName,
+                eventSignature: storedLog.eventSignature,
+                logIndex: storedLog.logIndex,
+                removed: storedLog.removed,
+                topics: storedLog.topics,
+                transactionHash: storedLog.transactionHash,
+                transactionIndex: storedLog.transactionIndex,
+              });
+
+              let enrichResult: unknown;
+              try {
+                enrichResult = await enricher(enrichmentContext);
+              } catch (cause) {
+                throw new EventEnrichmentError(
+                  `Enrichment function failed for event ${storedLog.eventId}`,
+                  {
+                    cause,
+                    context: {
+                      blockNumber: storedLog.blockNumber.toString(),
+                      eventId: storedLog.eventId,
+                      eventName: storedLog.eventName,
+                      targetKey: this.#target.targetKey,
+                      transactionHash: storedLog.transactionHash,
+                    },
+                  },
+                );
+              }
+
+              if (enrichResult !== undefined && enrichResult !== null) {
+                additionalData = encodeDecodedValue(enrichResult);
+              }
+            }
+
+            storedEventLogs.push(
+              Object.freeze({
+                ...storedLog,
+                additionalData,
+              }),
+            );
+          }
           // Deliberately not pinned to fetchedRange.endpointIdentity: this
           // header is the independent check that the logs above are
           // consistent with the canonical chain, so it must not be served by
@@ -601,6 +694,7 @@ function normalizeLogs(
   contractAddress: Address,
   fromBlock: bigint,
   toBlock: bigint,
+  topics?: NormalizedRpcTopics,
 ): readonly RpcLog[] {
   const uniqueLogs = new Map<string, RpcLog>();
   for (const log of logs) {
@@ -615,6 +709,11 @@ function normalizeLogs(
     if (log.blockNumber < fromBlock || log.blockNumber > toBlock) {
       throw new StorageConsistencyError(
         "RPC returned a log outside the requested block range",
+      );
+    }
+    if (topics !== undefined && !matchesTopicFilter(log.topics, topics)) {
+      throw new StorageConsistencyError(
+        "RPC returned a log that does not match the requested topic filter",
       );
     }
     const identity = [log.blockHash, log.transactionHash, log.logIndex].join(
@@ -640,6 +739,7 @@ function createStoredEventLog(
   const decoded = decodeRawEventLog(catalog, rpcLog);
   const common = {
     abiFingerprint: catalog.abiFingerprint,
+    additionalData: null,
     blockHash: rpcLog.blockHash,
     blockNumber: rpcLog.blockNumber,
     contractAddress: rpcLog.address,

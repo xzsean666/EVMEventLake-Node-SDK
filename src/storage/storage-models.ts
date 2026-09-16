@@ -9,6 +9,7 @@ export type StoredDecodeStatus = "decode_failed" | "decoded" | "unknown";
 
 export interface StoredEventLog {
   readonly abiFingerprint: string;
+  readonly additionalData: string | null;
   readonly blockHash: Hex;
   readonly blockNumber: bigint;
   readonly contractAddress: Address;

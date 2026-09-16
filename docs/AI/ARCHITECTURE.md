@@ -152,7 +152,7 @@ Production consumers should pin a semantic version tag or immutable commit. Depe
 | `abi` | Complete ABI used to build the event catalog |
 | `startBlock` | First block eligible for synchronization, inclusive |
 
-Optional policies remain centralized and typed. The initial public policy surface should stay small: confirmation count, logging/progress callbacks, and advanced RPC/synchronization settings only when defaults are insufficient.
+Optional policies remain centralized and typed. The initial public policy surface covers: confirmation count, logging/progress callbacks, custom event enrichment hook (`enrichEvent`), and advanced RPC/synchronization settings.
 
 ### 4.3 Update options
 
@@ -161,6 +161,7 @@ Optional policies remain centralized and typed. The initial public policy surfac
 | `toBlock` | Explicit inclusive synchronization boundary |
 | `blockRange` | Preferred maximum number of blocks in one `eth_getLogs` request |
 | `signal` | Caller-provided cancellation signal |
+| `enrichEvent` | Optional sync/async function to compute custom JSON `additionalData` for each event, overriding default instance hook |
 
 When `toBlock` is omitted, the synchronization engine resolves the current RPC head and subtracts the configured confirmation count. An explicit `toBlock` never bypasses target identity validation or transaction safety.
 
@@ -403,8 +404,10 @@ Dependencies:
 Submodule boundaries are explicit:
 - `update-service` owns orchestration only.
 - `synchronization-range-planner` creates ordered inclusive ranges.
-- `adaptive-log-fetcher` resolves one preferred range into fetchable subranges.
 - `chain-consistency-checker` validates checkpoints and chooses a rewind point.
+- `normalizeLogs` applies defensive filter validation, ensuring returned logs strictly honor configured `topics`.
+
+Topic filtering (`topic0`..`topic3` and `topics` array/object) is normalized at configuration boundaries, propagated through `AdaptiveLogFetcher` into `eth_getLogs` single and batch payloads, and enforced defensively during log normalization.
 
 ### 6.7 `storage`
 
@@ -604,7 +607,7 @@ Stores target key, chain ID, normalized contract address, start block, next bloc
 Stores target key, ABI fingerprint, canonical ABI JSON, and registration timestamp.
 
 ### 9.3 `event_logs`
-Stores lossless chain identity and payload fields: target key, ABI fingerprint, block number, block hash, transaction hash, transaction index, log index, contract address, topics, data, event name/signature, canonical decoded arguments, and decode status (`decoded`, `unknown`, `decode_failed`).
+Stores lossless chain identity and payload fields: target key, ABI fingerprint, block number, block hash, transaction hash, transaction index, log index, contract address, topics, data, event name/signature, canonical decoded arguments, decode status (`decoded`, `unknown`, `decode_failed`), and optional enriched custom data (`additional_data`).
 
 ### 9.4 `event_parameters`
 Stores queryable decoded parameter rows: parameter name, ABI position, Solidity type, indexed flag, canonical comparable value, and raw topic value.
@@ -616,7 +619,7 @@ Stores target key, committed range end block, end block hash, and commit timesta
 Stores target-scoped lease owner token and expiration timestamp to prevent concurrent execution races.
 
 ### 9.7 `schema_migrations`
-Tracks forward-only database schema version migrations.
+Tracks forward-only database schema version migrations (Version 1: baseline schema; Version 2: addition of `additional_data` column on `event_logs`).
 
 ---
 
@@ -663,6 +666,14 @@ Query behavior is intentionally limited to persisted facts. There is no hidden R
 ### 11.2 Foundation SDK Re-export Architecture (`evm-call`)
 - **Subpath Decoupling**: Rather than dumping all `evm-call` exports onto the top-level SDK index, `src/evm-call.ts` is exported via the `"./evm-call"` package subpath mapping (`@evm-event-lake/node-sdk/evm-call`). This keeps the root SDK surface (`EVMEventLake`, `EventQuery`, typed errors) clean and isolated from foundation symbols like `RpcPool` or `JsonRpcBatchExecutor`.
 - **Zero Duplicate Dependencies**: Downstream consumer applications (which often need both event indexing and direct contract/RPC reading) import directly from `@evm-event-lake/node-sdk/evm-call` or use the root `EvmCall` namespace without declaring a second `evm-call` Git dependency in their own `package.json`. This eliminates pnpm phantom dependency issues, Git commit drift, and dual-package bundling hazards.
+
+### 11.3 Custom Event Enrichment Hook & Durable Additional Data (`additionalData`)
+- **Lifecycle Injection**: An `enrichEvent` hook can be supplied at client instantiation (`EVMEventLake.create({ enrichEvent })`) or overridden on per-sync operations (`lake.update({ enrichEvent })` or `lake.redecode({ enrichEvent })`).
+- **Sync & Async Flexibility**: Accepts both synchronous `(context) => data` and asynchronous `async (context) => Promise<data>` signatures. The enricher receives the full `EventEnrichmentContext` (raw log topics, data, decode status, and decoded arguments).
+- **Lossless Value Encoding**: The return value is serialized via `encodeDecodedValue()`, supporting arbitrary JSON data, nested arrays, objects, and `bigint` primitives.
+- **Durable Multi-Engine Storage**: Stored in the `additional_data` column (SQLite & PostgreSQL) / `additionalData` property (IndexedDB) with schema version 2 automatic migrations.
+- **Fail-Safe Transaction Abort**: If an enricher throws, the active synchronization range transaction rolls back atomically, and the failure is bubbled as an `EventEnrichmentError` without advancing the durable sync cursor.
+- **Transparent Query Projection**: Query services deserialize the stored JSON via `decodeDecodedValue()` and expose it as `eventRecord.additionalData` on `findMany()` and `findFirst()` results.
 
 ---
 

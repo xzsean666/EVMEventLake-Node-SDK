@@ -291,6 +291,56 @@ Callbacks receive redacted structured data. Their absence produces no required
 console output. Callback failure must not alter cursor correctness; the exact
 error-reporting behavior must be documented and tested during implementation.
 
+### 7.6 Optional event enrichment
+
+The caller may provide an `enrichEvent` callback:
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `enrichEvent` | `(context: EventEnrichmentContext) => unknown \| Promise<unknown>` | `undefined` | Hook invoked for each ingested event during synchronization or re-decoding |
+
+The callback receives an `EventEnrichmentContext` containing:
+- `chainId`: Chain identifier number.
+- `contractAddress`: Normalized 20-byte target contract address.
+- `blockNumber`: Event block number as bigint.
+- `blockHash`: Block hash.
+- `transactionHash`: Transaction hash.
+- `transactionIndex`: Integer index within block.
+- `logIndex`: Integer index within block.
+- `topics`: Readonly array of 32-byte hex topics.
+- `data`: Hex string payload.
+- `decodeStatus`: `"decoded"`, `"unknown"`, or `"decode_failed"`.
+- `eventName`: Decoded event name, or `null`.
+- `eventSignature`: Canonical event signature, or `null`.
+- `decodedArguments`: Decoded arguments record, or `null`.
+
+The hook may return any JSON-serializable value (including `bigint`, nested arrays, and objects) synchronously or asynchronously. The result is losslessly persisted in the dedicated `additional_data` column of `event_logs`. If the hook throws, the range transaction is cleanly aborted with a typed `EventEnrichmentError`.
+
+### 7.7 Native getLogs topic filters (`topics`, `topic0`..`topic3`)
+
+Callers may supply native EVM `eth_getLogs` topic filters to selectively ingest specific events and indexed parameters:
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `topics` | `LogTopicsFilter` (`TopicFilterArray \| TopicFilterObject`) | `undefined` | Native JSON-RPC topic filter (`(TopicFilterPrimitive \| readonly TopicFilterPrimitive[] \| null)[]` or `{ topic0?, topic1?, topic2?, topic3? }`) |
+| `topic0` | `TopicFilterValue` | `undefined` | Top-level convenience filter for event signature / first topic |
+| `topic1` | `TopicFilterValue` | `undefined` | Top-level convenience filter for first indexed parameter |
+| `topic2` | `TopicFilterValue` | `undefined` | Top-level convenience filter for second indexed parameter |
+| `topic3` | `TopicFilterValue` | `undefined` | Top-level convenience filter for third indexed parameter |
+
+**Key Capabilities & Invariants**:
+- **Multi-Type Topic Primitives (`TopicFilterPrimitive`)**: Supports `Hex`, 20-byte `Address`, `bigint`, safe `number`, and `boolean`:
+  - `bigint`: Encoded to 32-byte hex (e.g. `12345n` -> `0x00...3039`; signed negative integers encoded via 256-bit two's complement).
+  - `number`: Safe integer encoded to 32-byte hex (e.g. `42` -> `0x00...002a`).
+  - `boolean`: Encoded to 32-byte hex (`true` -> `0x00...01`, `false` -> `0x00...00`).
+  - `Address`: 20-byte EVM addresses (`0x${string}`) are automatically padded with leading zeros to 32 bytes (`padHex(addr, { size: 32, dir: "left" })`).
+  - `bytes32`: 32-byte hex strings (`0x${string}` with 64 hex characters, e.g. event signatures, hashes, role identifiers).
+- **Dual Representation**: Supports standard JSON-RPC array notation (e.g. `[topic0, null, topic2]`) as well as named object notation (e.g. `{ topic0: "0x...", topic1: 12345n }`).
+- **Selective Topic Targeting**: Any topic (including `topic0`) may be omitted; omitted topics become `null` (wildcard).
+- **Logical OR Support**: Nested arrays at any topic position specify logical OR conditions (e.g. `[[TRANSFER_TOPIC, APPROVAL_TOPIC], null]` or `topic1: [ALICE_ADDR, BOB_ADDR]`).
+- **RPC Wire Optimization**: Trailing `null` values are trimmed before JSON-RPC transmission; empty filters are omitted from requests.
+- **Defensive Storage Consistency**: Returned RPC logs are validated against the active topic filter inside `normalizeLogs`. Any malformed or violating log returned by a broken RPC endpoint triggers a typed `StorageConsistencyError` before touching storage.
+
 ## 8. Update Options and Semantics
 
 | Option | Accepted value | Behavior |
@@ -298,6 +348,12 @@ error-reporting behavior must be documented and tested during implementation.
 | `toBlock` | Non-negative safe number or bigint | Explicit inclusive boundary |
 | `blockRange` | Positive safe integer | Overrides preferred range for this update only |
 | `signal` | Abort signal | Requests cooperative cancellation |
+| `enrichEvent` | `EventEnricher` function | Overrides or supplies the event enrichment hook for this update only |
+| `topics` | `LogTopicsFilter` | Overrides or supplies topic filter for this update only |
+| `topic0` | `TopicFilterValue` | Overrides or supplies topic0 for this update only |
+| `topic1` | `TopicFilterValue` | Overrides or supplies topic1 for this update only |
+| `topic2` | `TopicFilterValue` | Overrides or supplies topic2 for this update only |
+| `topic3` | `TopicFilterValue` | Overrides or supplies topic3 for this update only |
 
 ### 8.1 Automatic target boundary
 
@@ -461,11 +517,12 @@ contract must be stable and documented before implementation completes.
 
 ### 10.5 Historical Re-decoding
 
-When upgradeable proxy contracts upgrade their implementation ABI or expand their event catalog, callers can re-evaluate previously stored logs using `client.redecode({ abi, fromBlock?, toBlock?, redecodeAll?, batchSize?, onProgress?, signal? })`:
+When upgradeable proxy contracts upgrade their implementation ABI or expand their event catalog, callers can re-evaluate previously stored logs using `client.redecode({ abi, fromBlock?, toBlock?, redecodeAll?, enrichEvent?, batchSize?, onProgress?, signal? })`:
 
 - Registers the new ABI version into `abi_versions` and updates the active target ABI fingerprint without overwriting historical version history.
 - Iterates over existing event logs using deterministic cursor pagination. By default (`redecodeAll: false`), only previously `unknown` or `decode_failed` logs are re-decoded; when `redecodeAll: true`, all logs within the block range are re-evaluated.
 - Atomically replaces decoded fields in `event_logs` and synchronizes indexed lookup rows in `event_parameters` in batched transactions.
+- If an `enrichEvent` hook is provided, re-executes enrichment and updates the durable `additional_data` column; if omitted, existing `additional_data` is preserved intact.
 - Merges the newly registered event definitions into the query catalog so that events from all known contract versions can be queried.
 - Mutual exclusion guarantees `redecode()` and `update()` cannot execute concurrently on the same SDK instance.
 
@@ -607,6 +664,7 @@ Each result includes:
 - Event name and signature when decoded.
 - Decoded arguments when decoded.
 - ABI fingerprint used for decoding.
+- Additional data (`additionalData`): Custom JSON payload returned by `enrichEvent`, or `null`.
 
 ## 14. Update Result
 
@@ -637,6 +695,7 @@ The public error hierarchy must distinguish at least:
 - Target metadata conflict error.
 - Synchronization locked error.
 - Synchronization failed after partial committed progress.
+- Event enrichment error (`EVENT_ENRICHMENT_ERROR` / `EventEnrichmentError`).
 - No valid RPC endpoint error.
 - RPC chain mismatch error.
 - RPC request failure with classified category.

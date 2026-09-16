@@ -176,6 +176,7 @@ export function runStorageAdapterContract(
       expect(events).toHaveLength(1);
       expect(events[0]?.eventId).toBe(log.eventId);
       expect(events[0]?.parameters).toEqual(log.parameters);
+      expect(events[0]?.additionalData).toBe(log.additionalData);
 
       const eventsWithUnindexed = await adapter.queryEvents({
         eventName: "ValueChanged",
@@ -402,6 +403,7 @@ function createUnknownStoredLog(input: {
   );
   return Object.freeze({
     abiFingerprint: catalog.abiFingerprint,
+    additionalData: null,
     blockHash,
     blockNumber: input.blockNumber,
     contractAddress,
@@ -427,6 +429,7 @@ function createUnknownStoredLog(input: {
 }
 
 function createStoredLog(input: {
+  readonly additionalData?: string | null;
   readonly blockNumber: bigint;
   readonly logIndex: number;
 }): StoredEventLog {
@@ -438,6 +441,7 @@ function createStoredLog(input: {
   );
   return Object.freeze({
     abiFingerprint: catalog.abiFingerprint,
+    additionalData: input.additionalData ?? null,
     blockHash,
     blockNumber: input.blockNumber,
     contractAddress,

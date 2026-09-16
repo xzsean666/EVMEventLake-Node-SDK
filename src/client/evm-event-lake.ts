@@ -92,6 +92,9 @@ export class EVMEventLake {
       const queryService = new EventQueryService({ catalog, storage, target });
       const updateService = new UpdateService({
         catalog,
+        ...(normalized.enrichEvent === undefined
+          ? {}
+          : { enrichEvent: normalized.enrichEvent }),
         ...(normalized.observability.logger === undefined
           ? {}
           : { logger: normalized.observability.logger }),
@@ -103,6 +106,9 @@ export class EVMEventLake {
         storage,
         synchronizationPolicy: normalized.synchronization,
         target,
+        ...(normalized.topics === undefined
+          ? {}
+          : { topics: normalized.topics }),
       });
       const redecodeService = new RedecodeService({
         ...(normalized.observability.logger === undefined

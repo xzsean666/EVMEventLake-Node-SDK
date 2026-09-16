@@ -35,7 +35,7 @@ import {
   type UpdateDecodedLogsResult,
 } from "./storage-models.js";
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 const BULK_LOGS_CHUNK_SIZE = 500;
 const BULK_PARAMETERS_CHUNK_SIZE = 1000;
 const BULK_IN_CHUNK_SIZE = 1000;
@@ -55,14 +55,7 @@ export class SqlStorageAdapter implements StorageAdapter {
   public async initialize(): Promise<void> {
     try {
       await this.#createSchema();
-      await this.#database
-        .insertInto("schema_migrations")
-        .values({
-          applied_at: new Date().toISOString(),
-          version: SCHEMA_VERSION,
-        })
-        .onConflict((conflict) => conflict.column("version").doNothing())
-        .execute();
+      await this.#migrateSchema();
     } catch (cause) {
       throw new StorageInitializationError(
         "Unable to initialize storage schema",
@@ -557,6 +550,7 @@ export class SqlStorageAdapter implements StorageAdapter {
           .updateTable("event_logs")
           .set({
             abi_fingerprint: log.abiFingerprint,
+            additional_data: log.additionalData,
             decode_status: log.decodeStatus,
             decoded_arguments: log.decodedArguments,
             event_name: log.eventName,
@@ -806,6 +800,7 @@ export class SqlStorageAdapter implements StorageAdapter {
       .addColumn("event_name", "text")
       .addColumn("event_signature", "text")
       .addColumn("decoded_arguments", "text")
+      .addColumn("additional_data", "text")
       .addColumn("created_at", "text", (column) => column.notNull())
       .execute();
     await this.#database.schema
@@ -897,6 +892,45 @@ export class SqlStorageAdapter implements StorageAdapter {
       .addColumn("expires_at", "text", (column) => column.notNull())
       .execute();
   }
+
+  async #migrateSchema(): Promise<void> {
+    const migrations = await this.#database
+      .selectFrom("schema_migrations")
+      .select("version")
+      .execute();
+    const applied = new Set(migrations.map((row) => row.version));
+
+    if (!applied.has(1)) {
+      await this.#database
+        .insertInto("schema_migrations")
+        .values({
+          applied_at: new Date().toISOString(),
+          version: 1,
+        })
+        .onConflict((conflict) => conflict.column("version").doNothing())
+        .execute();
+      applied.add(1);
+    }
+
+    if (!applied.has(SCHEMA_VERSION)) {
+      try {
+        await this.#database.schema
+          .alterTable("event_logs")
+          .addColumn("additional_data", "text")
+          .execute();
+      } catch {
+        // Ignored if column already exists
+      }
+      await this.#database
+        .insertInto("schema_migrations")
+        .values({
+          applied_at: new Date().toISOString(),
+          version: SCHEMA_VERSION,
+        })
+        .onConflict((conflict) => conflict.column("version").doNothing())
+        .execute();
+    }
+  }
 }
 
 function validateCommitRangeRequest(request: CommitRangeRequest): void {
@@ -936,6 +970,7 @@ function eventLogToRow(
 ): StorageDatabaseSchema["event_logs"] {
   return {
     abi_fingerprint: log.abiFingerprint,
+    additional_data: log.additionalData,
     block_hash: log.blockHash.toLowerCase(),
     block_number_key: blockNumberToStorageKey(log.blockNumber),
     contract_address: log.contractAddress.toLowerCase(),
@@ -961,6 +996,7 @@ function rowToStoredEventLog(
 ): StoredEventLog {
   return Object.freeze({
     abiFingerprint: row.abi_fingerprint,
+    additionalData: row.additional_data ?? null,
     blockHash: row.block_hash as Hex,
     blockNumber: storageKeyToBlockNumber(row.block_number_key),
     contractAddress: row.contract_address as Address,

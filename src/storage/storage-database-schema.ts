@@ -7,6 +7,7 @@ export interface AbiVersionTable {
 
 export interface EventLogTable {
   abi_fingerprint: string;
+  additional_data: string | null;
   block_hash: string;
   block_number_key: string;
   contract_address: string;

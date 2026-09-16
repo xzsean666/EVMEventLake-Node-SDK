@@ -3,6 +3,10 @@ import type { Abi } from "viem";
 import { encodeDecodedValue } from "../abi/decoded-value-codec.js";
 import type { EventCatalog } from "../abi/event-catalog.js";
 import { decodeRawEventLog, type RawEvmLog } from "../abi/event-decoder.js";
+import type {
+  EventEnricher,
+  EventEnrichmentContext,
+} from "../configuration/sdk-options.js";
 import { normalizeBlockNumber } from "../configuration/validate-sdk-options.js";
 import type { ContractTarget } from "../contract-target/contract-target.js";
 import { ConfigurationValidationError } from "../errors/evm-event-lake-errors.js";
@@ -17,6 +21,7 @@ import type {
 export interface RedecodeOptions {
   readonly abi: Abi;
   readonly batchSize?: number;
+  readonly enrichEvent?: EventEnricher;
   readonly fromBlock?: bigint | number;
   readonly onProgress?: (progress: RedecodeProgress) => void;
   readonly redecodeAll?: boolean;
@@ -95,6 +100,15 @@ export class RedecodeService {
       throw new ConfigurationValidationError(
         "batchSize must be a positive safe integer",
         { context: { batchSize } },
+      );
+    }
+
+    if (
+      options.enrichEvent !== undefined &&
+      typeof options.enrichEvent !== "function"
+    ) {
+      throw new ConfigurationValidationError(
+        "redecode.enrichEvent must be a function",
       );
     }
 
@@ -177,34 +191,67 @@ export class RedecodeService {
 
         const decodeResult = decodeRawEventLog(newCatalog, rawLog);
 
+        let additionalData = log.additionalData;
+        if (options.enrichEvent !== undefined) {
+          const enrichmentContext: EventEnrichmentContext = Object.freeze({
+            abiFingerprint: newCatalog.abiFingerprint,
+            arguments:
+              decodeResult.status === "decoded" ? decodeResult.arguments : null,
+            blockHash: log.blockHash,
+            blockNumber: log.blockNumber,
+            chainId: this.#target.chainId,
+            contractAddress: log.contractAddress,
+            data: log.data,
+            decodeStatus: decodeResult.status,
+            eventId: log.eventId,
+            eventName:
+              decodeResult.status === "decoded" ? decodeResult.eventName : null,
+            eventSignature:
+              decodeResult.status === "decoded"
+                ? decodeResult.eventSignature
+                : null,
+            logIndex: log.logIndex,
+            removed: log.removed,
+            topics: log.topics,
+            transactionHash: log.transactionHash,
+            transactionIndex: log.transactionIndex,
+          });
+          const enrichResult = await options.enrichEvent(enrichmentContext);
+          additionalData =
+            enrichResult !== undefined && enrichResult !== null
+              ? encodeDecodedValue(enrichResult)
+              : null;
+        }
+
         if (decodeResult.status === "decoded") {
           const wasAlreadyDecoded =
             log.decodeStatus === "decoded" &&
             log.eventSignature === decodeResult.eventSignature;
 
-          if (wasAlreadyDecoded) {
+          if (wasAlreadyDecoded && options.enrichEvent === undefined) {
             unchangedLogs++;
           } else {
             newlyDecodedLogs++;
+            logsToUpdate.push(
+              Object.freeze({
+                ...log,
+                abiFingerprint: newCatalog.abiFingerprint,
+                additionalData,
+                decodeStatus: "decoded" as const,
+                decodedArguments: encodeDecodedValue(decodeResult.arguments),
+                eventName: decodeResult.eventName,
+                eventSignature: decodeResult.eventSignature,
+                parameters: decodeResult.parameters,
+              }),
+            );
           }
-
-          logsToUpdate.push(
-            Object.freeze({
-              ...log,
-              abiFingerprint: newCatalog.abiFingerprint,
-              decodeStatus: "decoded" as const,
-              decodedArguments: encodeDecodedValue(decodeResult.arguments),
-              eventName: decodeResult.eventName,
-              eventSignature: decodeResult.eventSignature,
-              parameters: decodeResult.parameters,
-            }),
-          );
         } else if (decodeResult.status === "decode_failed") {
           failedLogs++;
           logsToUpdate.push(
             Object.freeze({
               ...log,
               abiFingerprint: newCatalog.abiFingerprint,
+              additionalData,
               decodeStatus: "decode_failed" as const,
               decodedArguments: null,
               eventName: null,
@@ -213,13 +260,17 @@ export class RedecodeService {
             }),
           );
         } else {
-          if (log.decodeStatus === "unknown") {
+          if (
+            log.decodeStatus === "unknown" &&
+            options.enrichEvent === undefined
+          ) {
             unchangedLogs++;
           } else {
             logsToUpdate.push(
               Object.freeze({
                 ...log,
                 abiFingerprint: newCatalog.abiFingerprint,
+                additionalData,
                 decodeStatus: "unknown" as const,
                 decodedArguments: null,
                 eventName: null,

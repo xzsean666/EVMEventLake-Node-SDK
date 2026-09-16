@@ -286,6 +286,10 @@ export class EventQueryService {
   #mapEvent(row: StoredEventLog): EventRecord {
     return Object.freeze({
       abiFingerprint: row.abiFingerprint,
+      additionalData:
+        row.additionalData === null || row.additionalData === undefined
+          ? null
+          : decodeDecodedValue(row.additionalData),
       arguments:
         row.decodedArguments === null
           ? null

@@ -3,10 +3,23 @@ export type { SyncCheckpoint, SyncStatus } from "./client/sync-status.js";
 export type {
   BlockNumberInput,
   EVMEventLakeOptions,
+  EventEnricher,
+  EventEnrichmentContext,
+  LogTopicsFilter,
+  NormalizedRpcTopic,
+  NormalizedRpcTopics,
   ObservabilityOptions,
   RpcPolicyOptions,
   SynchronizationPolicyOptions,
+  TopicFilterArray,
+  TopicFilterObject,
+  TopicFilterPrimitive,
+  TopicFilterValue,
 } from "./configuration/sdk-options.js";
+export {
+  matchesTopicFilter,
+  normalizeTopicsFilter,
+} from "./configuration/validate-sdk-options.js";
 export * from "./errors/evm-event-lake-errors.js";
 export type {
   SdkLogEvent,

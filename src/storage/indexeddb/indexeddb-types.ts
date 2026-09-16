@@ -23,6 +23,7 @@ export interface AbiVersionStoreRow {
 
 export interface EventLogStoreRow {
   abiFingerprint: string;
+  additionalData: string | null;
   blockHash: Hex;
   blockNumberKey: string;
   contractAddress: string;

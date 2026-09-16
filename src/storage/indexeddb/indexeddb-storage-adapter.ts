@@ -43,7 +43,7 @@ import type {
   SyncLeaseStoreRow,
 } from "./indexeddb-types.js";
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 const STORES = {
   abiVersions: "abi_versions",
@@ -406,6 +406,7 @@ export class IndexeddbStorageAdapter implements StorageAdapter {
           const blockNumberKey = blockNumberToStorageKey(log.blockNumber);
           const logRow: EventLogStoreRow = {
             abiFingerprint: log.abiFingerprint,
+            additionalData: log.additionalData,
             blockHash: log.blockHash.toLowerCase() as Hex,
             blockNumberKey,
             contractAddress: log.contractAddress.toLowerCase(),
@@ -687,6 +688,7 @@ export class IndexeddbStorageAdapter implements StorageAdapter {
 
           if (existingRow !== undefined) {
             existingRow.abiFingerprint = log.abiFingerprint;
+            existingRow.additionalData = log.additionalData;
             existingRow.decodeStatus = log.decodeStatus;
             existingRow.decodedArguments = log.decodedArguments;
             existingRow.eventName = log.eventName;
@@ -1224,6 +1226,7 @@ function rowToStoredEventLog(row: EventLogStoreRow): StoredEventLog {
 
   return Object.freeze({
     abiFingerprint: row.abiFingerprint,
+    additionalData: row.additionalData ?? null,
     blockHash: row.blockHash,
     blockNumber: storageKeyToBlockNumber(row.blockNumberKey),
     contractAddress: row.contractAddress as Address,

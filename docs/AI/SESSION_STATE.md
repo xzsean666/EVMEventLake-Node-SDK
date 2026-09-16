@@ -5,31 +5,32 @@ Last updated: 2026-09-16
 ---
 
 ### 1. 当前 Goal
-全面安全、性能与逻辑正确性审计加固，以及文档规格升级（TASK-000 至 TASK-011）：在 `evm-call` 核心底座与三端存储契约对齐的基础上，彻底排查并消除大规模数据同步与多端运行时的崩溃隐患、逻辑状态不同步漏洞、浏览器同构兼容性缺陷与低效游标全表扫描，将 SDK 打造成工业级安全可靠、高性能、无 Node 专有全局依赖的生产就绪版本。
+全面安全、性能与逻辑正确性审计加固，以及文档规格升级（TASK-000 至 TASK-013）：在 `evm-call` 核心底座与三端存储契约对齐的基础上，彻底排查并消除大规模数据同步与多端运行时的崩溃隐患、逻辑状态不同步漏洞、浏览器同构兼容性缺陷与低效游标全表扫描，将 SDK 打造成工业级安全可靠、高性能、支持灵活业务挂载扩展（Custom Event Enrichment Hook）的生产就绪版本。
 
 ---
 
 ## 2. 当前 Task
-**TASK-012: Subpath and Namespace Re-Export for evm-call Foundation SDK**
-- **创建子路径模块 `src/evm-call.ts`**:
-  - 全量重新导出底层底座 `export * from "evm-call"`。
-  - 构建生成 `dist/evm-call.js` 与 `dist/evm-call.d.ts`。
-- **配置 `package.json` Subpath Exports**:
-  - 注册 `"./evm-call": { "types": "./dist/evm-call.d.ts", "import": "./dist/evm-call.js" }`。
-- **根路径聚合导出 `EvmCall` 命名空间**:
-  - 在 `src/index.ts` 中暴露 `export * as EvmCall from "./evm-call.js"`。
-  - 确保根命名空间不泄漏 `RpcPool` 等冲突符号，保持 EventLake 原有公共 API 抽象隔离。
-- **全链路用例与下游工程验证**:
-  - 编写 `tests/unit/evm-call-export.test.ts` 专项单测；
-  - 增强 `tests/unit/public-api.test.ts`；
-  - 扩展 `example/typecheck.ts` 与 `example/test/github-installed-sdk.test.mjs`，验证独立 Git 安装与消费工程中的开箱即用体验。
-- **文档与规范同步**:
-  - 更新 `README.md`、`docs/SPEC.md`、`docs/AI/ARCHITECTURE.md` 与 `docs/AI/CONTEXT_EVM_CALL.md`。
+**TASK-014: Native getLogs Topic Filters Support (`topic0`..`topic3`)**
+- **Topic Filter Types & Normalization**:
+  - 定义 `TopicFilterValue`, `TopicFilterObject`, `TopicFilterArray`, `LogTopicsFilter`, `NormalizedRpcTopic`, `NormalizedRpcTopics`；
+  - 实现 `normalizeTopicsFilter`，兼容数组形式与 `{ topic0, topic1, topic2, topic3 }` 对象形式，以及顶层参数；
+  - 自动将 20 字节地址通过 `padHex(addr, { size: 32, dir: "left" })` 补齐为 32 字节 EVM topic 格式；
+  - 自动 trim 尾部 null，校验 hex 格式与最多 4 个 topics 限制。
+- **Options 与 Client 集成**:
+  - `EVMEventLakeOptions` 与 `UpdateOptions` 增加 `topics` 与 `topic0..topic3`；
+  - `EVMEventLake.create` 设置实例级默认 topic filter，`lake.update({ topics })` 支持每次更新覆写。
+- **RPC Ingestion 与同步引擎**:
+  - `RpcPool.fetchLogs` 与 `fetchLogsBatch` 将 `topics` 下发至 `eth_getLogs` RPC 调用；
+  - `AdaptiveLogFetcher` 与 `UpdateService` 全流程透传 `topics` 参数；
+  - `normalizeLogs` 增加防御性 topic 匹配检查，杜绝异常 RPC 节点返回违背 filter 的日志。
+- **测试与文档**:
+  - 编写专项测试套件 `tests/unit/topic-filter.test.ts`；
+  - 更新 `docs/SPEC.md` 与 `docs/AI/ARCHITECTURE.md`。
 
 ---
 
 ## 3. 当前状态
-**DONE** (All tasks TASK-000 through TASK-012 are completed and verified)
+**DONE**
 
 ---
 
@@ -47,22 +48,25 @@ Last updated: 2026-09-16
 11. **`TASK-010`**: Indexed Dynamic Values & Parameter Search (`DONE`)
 12. **`TASK-011`**: Comprehensive Audit Hardening & Security, Performance, and Correctness Optimization (`DONE`)
 13. **`TASK-012`**: Subpath and Namespace Re-Export for evm-call Foundation SDK (`DONE`)
+14. **`TASK-013`**: Custom Event Enrichment Hook with Durable Additional Data (`additionalData`) (`DONE`)
+15. **`TASK-014`**: Native getLogs Topic Filters Support (`topic0`..`topic3`) (`DONE`)
 
 ---
 
 ## 5. 本次 Task 修改过的文件
-- `src/evm-call.ts` (新建)
+- `src/configuration/sdk-options.ts`
+- `src/configuration/validate-sdk-options.ts`
+- `src/rpc/rpc-pool.ts`
+- `src/synchronization/adaptive-log-fetcher.ts`
+- `src/synchronization/update-service.ts`
+- `src/synchronization/synchronization-result.ts`
+- `src/client/evm-event-lake.ts`
 - `src/index.ts`
-- `package.json`
-- `tests/unit/evm-call-export.test.ts` (新建)
-- `tests/unit/public-api.test.ts`
-- `example/typecheck.ts`
-- `example/test/github-installed-sdk.test.mjs`
+- `tests/unit/topic-filter.test.ts` (新建)
 - `README.md`
 - `docs/SPEC.md`
 - `docs/AI/ARCHITECTURE.md`
-- `docs/AI/CONTEXT_EVM_CALL.md`
-- `docs/AI/tasks/TASK-012.md` (新建)
+- `docs/AI/tasks/TASK-014.md` (新建)
 - `docs/AI/TASK_INDEX.md`
 - `docs/AI/SESSION_STATE.md`
 
@@ -71,33 +75,35 @@ Last updated: 2026-09-16
 ## 6. 已运行的验证命令及结果
 - `pnpm run format:check`：全部文件格式匹配 Prettier（Exit code 0）。
 - `pnpm run lint`：0 错误，0 警告（Exit code 0）。
-- `pnpm run typecheck`：通过（Exit code 0）。
-- `pnpm test tests/unit/evm-call-export.test.ts`：专项导出单测通过（Exit code 0）。
-- `pnpm run test`：31 个测试套件，143 个测试全部通过（2 个外部真实环境测试跳过）（Exit code 0）。
-- `pnpm run build`：编译成功生成 `dist/index.js`, `dist/index.d.ts`, `dist/evm-call.js`, `dist/evm-call.d.ts`（Exit code 0）。
-- `node scripts/test-git-install.mjs`：独立临时消费工程克隆并安装 Git 提交产物，验证通过 `@evm-event-lake/node-sdk/evm-call` 与 `EvmCall` 的解构使用与类型推断（Exit code 0）。
+- `pnpm run typecheck`：通过，无任何 TypeScript 报错（Exit code 0）。
+- `pnpm test tests/unit/topic-filter.test.ts`：专项 22 个测试全数通过（Exit code 0）。
+- `pnpm run test`：31 个测试套件，170 个单元/契约/集成测试全部通过（2 个外部真实环境测试跳过）（Exit code 0）。
+- `pnpm run build`：编译成功生成产物（Exit code 0）。
 - `pnpm run verify`：流水线五步全量验证完整通过（Exit code 0）。
 
 ---
 
 ## 7. 未解决问题
-无。已完全满足下游项目零重复声明、直接复用底层 `evm-call` 基础设施的诉求。
+无。全部功能需求及边界测试均已严格验证完毕。
 
 ---
 
 ## 8. 风险和假设
-- 下游使用者若需要精细化控制 Tree-shaking，推荐使用子路径 `@evm-event-lake/node-sdk/evm-call`。
-- 根导出保留 `EvmCall` 命名空间，顶层绝不平铺透出 `RpcPool`，确保核心 EventLake SDK 的 API 独立性与清晰度。
+- EVM RPC 标准规定：topics 为最多 4 个元素的数组。若传入超过 4 个 topics，立即抛出 `ConfigurationValidationError`。
+- 自动将 20 字节标准 EVM 地址通过 `padHex(addr, { size: 32, dir: "left" })` 补齐为 32 字节 EVM topic 格式，完全兼容开发者传入 address 过滤 indexed address 参数的场景。
+- 尾部连续 `null` 会自动 trim，全空 topics 会安全省略，避免部分 RPC 节点对尾部 null 或空数组报错。
 
 ---
 
 ## 9. 最新维护记录
-- **evm-call 底座子路径导出与命名空间复用 (TASK-012)**:
-  - 新增 `src/evm-call.ts` 并注册 package.json `"./evm-call"` 子路径导出；
-  - 根路径导出 `EvmCall` 命名空间；
-  - 外部独立安装工程验证通过，下游完全无需安装或声明 `evm-call`。
+- **原生 getLogs Topic Filters 过滤支持 (TASK-014)**:
+  - 允许在创建 SDK 时配置 `topics` 或 `topic0..topic3`，或在 `update()` 时动态覆写；
+  - 支持标准 JSON-RPC 数组 notation 及命名对象 `{ topic0, topic1, topic2, topic3 }`；
+  - 支持嵌套数组逻辑 OR 过滤（如 `[[TRANSFER_TOPIC, APPROVAL_TOPIC], null]`）；
+  - 全流程下发至 `RpcPool.fetchLogs` 及 `fetchLogsBatch` 的 `eth_getLogs` RPC 调用；
+  - `normalizeLogs` 增加防御性 topic 匹配检查，杜绝异常 RPC 节点返回不匹配日志。
 
 ---
 
 ## 10. 下一步计划
-- 保持准备就绪状态。待用户确认后可打上 Git Tag 发布。
+- 保持准备就绪状态。待用户确认后可打上 Git Tag `v0.1.0` 发布。

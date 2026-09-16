@@ -27,6 +27,7 @@ export interface EventQuery {
 
 export interface EventRecord {
   readonly abiFingerprint: string;
+  readonly additionalData: unknown;
   readonly arguments: unknown;
   readonly blockHash: Hex;
   readonly blockNumber: bigint;

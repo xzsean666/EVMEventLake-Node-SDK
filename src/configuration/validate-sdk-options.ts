@@ -1,6 +1,14 @@
 import { resolve } from "node:path";
 
-import { getAddress, isAddress, type Abi, type AbiEvent } from "viem";
+import {
+  getAddress,
+  isAddress,
+  padHex,
+  toHex,
+  type Abi,
+  type AbiEvent,
+  type Hex,
+} from "viem";
 import { formatAbiItem } from "viem/utils";
 
 import {
@@ -13,11 +21,16 @@ import {
   DEFAULT_SYNCHRONIZATION_POLICY,
   type DatabaseConfiguration,
   type EVMEventLakeOptions,
+  type LogTopicsFilter,
   type NormalizedEVMEventLakeOptions,
   type NormalizedRpcPolicy,
+  type NormalizedRpcTopic,
+  type NormalizedRpcTopics,
   type NormalizedSynchronizationPolicy,
   type RpcPolicyOptions,
   type SynchronizationPolicyOptions,
+  type TopicFilterObject,
+  type TopicFilterValue,
 } from "./sdk-options.js";
 
 function normalizeNonNegativeInteger(
@@ -417,6 +430,239 @@ function deepFreeze<Value>(value: Value): Value {
   return value;
 }
 
+const TOPIC_HEX_PATTERN = /^0x[0-9a-fA-F]{64}$/;
+const ADDRESS_HEX_PATTERN = /^0x[0-9a-fA-F]{40}$/;
+
+function encodeBigIntTopic(val: bigint, contextPath: string): Hex {
+  if (val >= 0n) {
+    if (val >= 1n << 256n) {
+      throw new ConfigurationValidationError(
+        `${contextPath} bigint value exceeds 256 bits`,
+        { context: { field: contextPath, value: val.toString() } },
+      );
+    }
+    return toHex(val, { size: 32 });
+  }
+  // Signed integer (two's complement for 256 bits)
+  const minInt256 = -(1n << 255n);
+  if (val < minInt256) {
+    throw new ConfigurationValidationError(
+      `${contextPath} negative bigint value exceeds 256-bit signed integer range`,
+      { context: { field: contextPath, value: val.toString() } },
+    );
+  }
+  const twosComplement = (1n << 256n) + val;
+  return toHex(twosComplement, { size: 32 });
+}
+
+function normalizeSingleTopic(value: unknown, contextPath: string): Hex {
+  if (typeof value === "boolean") {
+    return toHex(value, { size: 32 });
+  }
+
+  if (typeof value === "bigint") {
+    return encodeBigIntTopic(value, contextPath);
+  }
+
+  if (typeof value === "number") {
+    if (!Number.isSafeInteger(value)) {
+      throw new ConfigurationValidationError(
+        `${contextPath} number must be a safe integer`,
+        { context: { field: contextPath, value } },
+      );
+    }
+    return encodeBigIntTopic(BigInt(value), contextPath);
+  }
+
+  if (typeof value === "string") {
+    if (TOPIC_HEX_PATTERN.test(value)) {
+      return value.toLowerCase() as Hex;
+    }
+    if (ADDRESS_HEX_PATTERN.test(value)) {
+      return padHex(value.toLowerCase() as Hex, { size: 32, dir: "left" });
+    }
+    throw new ConfigurationValidationError(
+      `${contextPath} must be a valid 32-byte hex topic, 20-byte address, number, bigint, or boolean (received "${value}")`,
+      { context: { field: contextPath, value } },
+    );
+  }
+
+  throw new ConfigurationValidationError(
+    `${contextPath} must be a 32-byte hex string, 20-byte address, number, bigint, or boolean`,
+    { context: { field: contextPath, value } },
+  );
+}
+
+function normalizeTopicEntry(
+  item: unknown,
+  contextPath: string,
+): NormalizedRpcTopic {
+  if (item === null || item === undefined) {
+    return null;
+  }
+  if (
+    typeof item === "string" ||
+    typeof item === "bigint" ||
+    typeof item === "number" ||
+    typeof item === "boolean"
+  ) {
+    return normalizeSingleTopic(item, contextPath);
+  }
+  if (Array.isArray(item)) {
+    const itemArray: readonly unknown[] = item;
+    if (itemArray.length === 0) {
+      throw new ConfigurationValidationError(
+        `${contextPath} array cannot be empty`,
+        { context: { field: contextPath } },
+      );
+    }
+    const normalizedList: Hex[] = [];
+    for (let j = 0; j < itemArray.length; j++) {
+      const subItem = itemArray[j];
+      if (subItem === null || subItem === undefined) {
+        throw new ConfigurationValidationError(
+          `${contextPath}[${j}] inside an OR topic array cannot be null or undefined`,
+          { context: { field: `${contextPath}[${j}]` } },
+        );
+      }
+      normalizedList.push(
+        normalizeSingleTopic(subItem, `${contextPath}[${j}]`),
+      );
+    }
+    return Object.freeze(normalizedList);
+  }
+  throw new ConfigurationValidationError(
+    `${contextPath} has invalid topic format`,
+    { context: { field: contextPath, value: item } },
+  );
+}
+
+export interface TopicFilterOptionsInput {
+  readonly topic0?: TopicFilterValue | undefined;
+  readonly topic1?: TopicFilterValue | undefined;
+  readonly topic2?: TopicFilterValue | undefined;
+  readonly topic3?: TopicFilterValue | undefined;
+  readonly topics?: LogTopicsFilter | null | undefined;
+}
+
+export function normalizeTopicsFilter(
+  input?: LogTopicsFilter | null,
+  topLevel?: TopicFilterOptionsInput,
+): NormalizedRpcTopics | undefined {
+  if (input === null) {
+    return undefined;
+  }
+
+  let effectiveInput: LogTopicsFilter | undefined = input ?? undefined;
+  if (effectiveInput === undefined) {
+    if (topLevel?.topics !== undefined) {
+      if (topLevel.topics === null) {
+        return undefined;
+      }
+      effectiveInput = topLevel.topics;
+    } else if (
+      topLevel?.topic0 !== undefined ||
+      topLevel?.topic1 !== undefined ||
+      topLevel?.topic2 !== undefined ||
+      topLevel?.topic3 !== undefined
+    ) {
+      effectiveInput = {
+        ...(topLevel.topic0 !== undefined ? { topic0: topLevel.topic0 } : {}),
+        ...(topLevel.topic1 !== undefined ? { topic1: topLevel.topic1 } : {}),
+        ...(topLevel.topic2 !== undefined ? { topic2: topLevel.topic2 } : {}),
+        ...(topLevel.topic3 !== undefined ? { topic3: topLevel.topic3 } : {}),
+      };
+    } else {
+      return undefined;
+    }
+  }
+
+  let rawList: readonly unknown[];
+
+  if (Array.isArray(effectiveInput)) {
+    if (effectiveInput.length > 4) {
+      throw new ConfigurationValidationError(
+        "topics filter cannot contain more than 4 topics (topic0..topic3)",
+        { context: { length: effectiveInput.length } },
+      );
+    }
+    rawList = effectiveInput;
+  } else if (typeof effectiveInput === "object" && effectiveInput !== null) {
+    for (const key of Object.keys(effectiveInput)) {
+      if (
+        key !== "topic0" &&
+        key !== "topic1" &&
+        key !== "topic2" &&
+        key !== "topic3"
+      ) {
+        throw new ConfigurationValidationError(
+          `Unrecognized topic key "${key}", expected topic0, topic1, topic2, or topic3`,
+          { context: { key } },
+        );
+      }
+    }
+    const obj = effectiveInput as TopicFilterObject;
+    rawList = [
+      obj.topic0 ?? topLevel?.topic0,
+      obj.topic1 ?? topLevel?.topic1,
+      obj.topic2 ?? topLevel?.topic2,
+      obj.topic3 ?? topLevel?.topic3,
+    ];
+  } else {
+    throw new ConfigurationValidationError(
+      "topics filter must be an array or an object with topic0..topic3 properties",
+      { context: { topics: effectiveInput } },
+    );
+  }
+
+  const normalized: NormalizedRpcTopic[] = [];
+  for (let i = 0; i < rawList.length; i++) {
+    const item = rawList[i];
+    normalized.push(normalizeTopicEntry(item, `topics[${i}]`));
+  }
+
+  while (normalized.length > 0 && normalized[normalized.length - 1] === null) {
+    normalized.pop();
+  }
+
+  if (normalized.length === 0) {
+    return undefined;
+  }
+
+  return Object.freeze(normalized);
+}
+
+export function matchesTopicFilter(
+  logTopics: readonly Hex[],
+  filterTopics: NormalizedRpcTopics | undefined,
+): boolean {
+  if (filterTopics === undefined || filterTopics.length === 0) {
+    return true;
+  }
+  for (let i = 0; i < filterTopics.length; i++) {
+    const filterItem = filterTopics[i];
+    if (filterItem === null || filterItem === undefined) {
+      continue;
+    }
+    const logTopic = logTopics[i];
+    if (logTopic === undefined) {
+      return false;
+    }
+    if (typeof filterItem === "string") {
+      if (filterItem.toLowerCase() !== logTopic.toLowerCase()) {
+        return false;
+      }
+    } else if (Array.isArray(filterItem)) {
+      const match = filterItem.some(
+        (candidate: string) =>
+          candidate.toLowerCase() === logTopic.toLowerCase(),
+      );
+      if (!match) return false;
+    }
+  }
+  return true;
+}
+
 export function validateSdkOptions(
   options: EVMEventLakeOptions,
 ): NormalizedEVMEventLakeOptions {
@@ -437,6 +683,16 @@ export function validateSdkOptions(
       { context: { contractAddress: options.contractAddress } },
     );
   }
+  if (
+    options.enrichEvent !== undefined &&
+    typeof options.enrichEvent !== "function"
+  ) {
+    throw new ConfigurationValidationError("enrichEvent must be a function", {
+      context: { enrichEvent: typeof options.enrichEvent },
+    });
+  }
+
+  const topics = normalizeTopicsFilter(options.topics, options);
 
   return Object.freeze({
     abi: validateAbi(options.abi),
@@ -445,11 +701,15 @@ export function validateSdkOptions(
       options.contractAddress,
     ).toLowerCase() as `0x${string}`,
     database: parseDatabaseConfiguration(options.database),
+    ...(options.enrichEvent === undefined
+      ? {}
+      : { enrichEvent: options.enrichEvent }),
     observability: Object.freeze({ ...(options.observability ?? {}) }),
     rpc: normalizeRpcPolicy(options.rpc),
     rpcUrls: normalizeRpcUrls(options.rpcUrls),
     startBlock: normalizeBlockNumber(options.startBlock, "startBlock"),
     synchronization: normalizeSynchronizationPolicy(options.synchronization),
+    ...(topics === undefined ? {} : { topics }),
   });
 }
 

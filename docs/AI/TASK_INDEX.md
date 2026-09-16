@@ -38,16 +38,15 @@ TODO -> IN_PROGRESS -> REVIEW -> DONE
 | **`TASK-010`** | Indexed Dynamic Values & Parameter Search | **DONE** | `TASK-000` | Transparent topic hashing for dynamic string/bytes and accelerated non-indexed query indices. | [`TASK-010.md`](tasks/TASK-010.md) |
 | **`TASK-011`** | Comprehensive Audit Hardening & Security, Performance, and Correctness Optimization | **DONE** | `TASK-010` | SQL variable chunking, redecode catalog sync, browser Buffer decoupling, IndexedDB O(1) keyset pagination, query validation hardening, and RPC batch resilience. | [`TASK-011.md`](tasks/TASK-011.md) |
 | **`TASK-012`** | Subpath and Namespace Re-Export for evm-call Foundation SDK | **DONE** | `TASK-011` | Expose `@evm-event-lake/node-sdk/evm-call` and `EvmCall` namespace so downstream projects can use foundation utilities without duplicate dependency declarations. | [`TASK-012.md`](tasks/TASK-012.md) |
+| **`TASK-013`** | Custom Event Enrichment Hook with Durable Additional Data (`additionalData`) | **DONE** | `TASK-000` | Custom sync/async event enricher hook (`enrichEvent`), storing custom JSON in `additional_data` database column with 100% parity across SQLite, PostgreSQL, and IndexedDB, returned on `EventRecord.additionalData`. | [`TASK-013.md`](tasks/TASK-013.md) |
+| **`TASK-014`** | Native getLogs Topic Filters Support (`topic0`..`topic3`) | **DONE** | `TASK-000` | Support native EVM `eth_getLogs` topic filters (`topic0`, `topic1`, `topic2`, `topic3`) across SDK options, update calls, RPC layer, and sync pipeline. | [`TASK-014.md`](tasks/TASK-014.md) |
 
 ---
 
 ## 3. Execution Priority & Next Up
 
-1. **Status**: **ALL TASKS COMPLETE (TASK-000 through TASK-012)**.
-   - All foundational features, audit remediations, optimizations, foundation re-exports, and parity tests complete across SQLite, PostgreSQL, and IndexedDB.
-   - Downstream consumers can directly access `@evm-event-lake/node-sdk/evm-call` and `EvmCall`.
-   - Ready for production release tag `v0.1.0`.
-
+1. **Current Active Task**: None (All tasks TASK-000 through TASK-014 are `DONE`).
+2. **Next Up**: Final verification and prepare Git release tag `v0.1.0`.
 
 ---
 

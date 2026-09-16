@@ -1,5 +1,6 @@
 import type { Address } from "viem";
 
+import type { NormalizedRpcTopics } from "../configuration/sdk-options.js";
 import {
   NoValidRpcEndpointError,
   OperationCancelledError,
@@ -67,6 +68,7 @@ export class AdaptiveLogFetcher {
   readonly #onRangeSplit:
     ((event: AdaptiveLogRangeSplitEvent) => void) | undefined;
   readonly #rpc: AdaptiveLogRpcClient;
+  readonly #topics: NormalizedRpcTopics | undefined;
   #rangeSplits = 0;
 
   public constructor(input: {
@@ -77,6 +79,7 @@ export class AdaptiveLogFetcher {
     readonly onRangeFetchStarted?: (range: SynchronizationRange) => void;
     readonly onRangeSplit?: (event: AdaptiveLogRangeSplitEvent) => void;
     readonly rpc: AdaptiveLogRpcClient;
+    readonly topics?: NormalizedRpcTopics | undefined;
   }) {
     this.#beforeRequest = input.beforeRequest;
     this.#contractAddress = input.contractAddress;
@@ -85,6 +88,7 @@ export class AdaptiveLogFetcher {
     this.#onRangeFetchStarted = input.onRangeFetchStarted;
     this.#onRangeSplit = input.onRangeSplit;
     this.#rpc = input.rpc;
+    this.#topics = input.topics;
   }
 
   public getMetrics(): AdaptiveLogFetcherMetrics {
@@ -119,6 +123,7 @@ export class AdaptiveLogFetcher {
         this.#contractAddress,
         ranges,
         {
+          ...(this.#topics === undefined ? {} : { topics: this.#topics }),
           ...(signal === undefined ? {} : { signal }),
         },
       );
@@ -166,6 +171,7 @@ export class AdaptiveLogFetcher {
           pendingRange.range.fromBlock,
           pendingRange.range.toBlock,
           {
+            ...(this.#topics === undefined ? {} : { topics: this.#topics }),
             ...(pendingRange.preferredEndpointIdentity === undefined
               ? {}
               : {

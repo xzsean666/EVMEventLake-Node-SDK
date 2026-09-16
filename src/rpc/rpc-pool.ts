@@ -1,7 +1,10 @@
 import { normalizeEvmLog, sortEvmLogs } from "evm-call";
 import { isAddress, type Address, type Hex } from "viem";
 
-import type { NormalizedRpcPolicy } from "../configuration/sdk-options.js";
+import type {
+  NormalizedRpcPolicy,
+  NormalizedRpcTopics,
+} from "../configuration/sdk-options.js";
 import { redactUrl } from "../configuration/validate-sdk-options.js";
 import {
   NoValidRpcEndpointError,
@@ -67,6 +70,7 @@ export interface FetchLogsOptions {
   readonly excludeEndpointIdentity?: string;
   readonly preferredEndpointIdentity?: string;
   readonly signal?: AbortSignal;
+  readonly topics?: NormalizedRpcTopics | undefined;
 }
 
 export interface RpcRequestOptions {
@@ -191,15 +195,17 @@ export class RpcPool {
     toBlock: bigint,
     options: FetchLogsOptions = {},
   ): Promise<RpcLogsResult> {
+    const filter: Record<string, unknown> = {
+      address: contractAddress,
+      fromBlock: toHexQuantity(fromBlock),
+      toBlock: toHexQuantity(toBlock),
+    };
+    if (options.topics !== undefined && options.topics.length > 0) {
+      filter.topics = options.topics;
+    }
     const result = await this.#requestWithFailover(
       "eth_getLogs",
-      [
-        {
-          address: contractAddress,
-          fromBlock: toHexQuantity(fromBlock),
-          toBlock: toHexQuantity(toBlock),
-        },
-      ],
+      [filter],
       parseRpcLogs,
       {
         immediateFailureCategories: new Set(["range_limit"]),
@@ -267,16 +273,20 @@ export class RpcPool {
 
       try {
         await this.#validateEndpoint(endpoint, options.signal);
-        const subRequests = ranges.map((range) => ({
-          method: "eth_getLogs",
-          params: [
-            {
-              address: contractAddress,
-              fromBlock: toHexQuantity(range.fromBlock),
-              toBlock: toHexQuantity(range.toBlock),
-            },
-          ],
-        }));
+        const subRequests = ranges.map((range) => {
+          const filter: Record<string, unknown> = {
+            address: contractAddress,
+            fromBlock: toHexQuantity(range.fromBlock),
+            toBlock: toHexQuantity(range.toBlock),
+          };
+          if (options.topics !== undefined && options.topics.length > 0) {
+            filter.topics = options.topics;
+          }
+          return {
+            method: "eth_getLogs",
+            params: [filter],
+          };
+        });
 
         this.#requestCount += 1;
         const batchResults = await this.#transport.requestBatch({
