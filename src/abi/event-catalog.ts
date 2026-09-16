@@ -77,6 +77,19 @@ export class EventCatalog {
   public findByName(name: string): readonly EventDefinition[] {
     return Object.freeze(this.events.filter((event) => event.name === name));
   }
+
+  public merge(other: EventCatalog): EventCatalog {
+    const combinedEvents = [
+      ...this.events.map((event) => event.abiEvent),
+      ...other.events.map((event) => event.abiEvent),
+    ];
+    const uniqueEvents = [
+      ...new Map(
+        combinedEvents.map((event) => [toEventSignature(event), event]),
+      ).values(),
+    ];
+    return new EventCatalog(uniqueEvents);
+  }
 }
 
 export function canonicalizeAbi(abi: Abi): string {

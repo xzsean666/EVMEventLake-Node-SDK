@@ -138,3 +138,38 @@ const TIMEOUT_TEXT = [
   "timed out",
   "timeout",
 ] as const;
+
+export function isRpcBatchRejection(error: unknown): boolean {
+  if (!(error instanceof RpcRequestFailure)) {
+    return false;
+  }
+  if (error.statusCode === 405 || error.statusCode === 501) {
+    return true;
+  }
+  const normalized = error.message.toLowerCase();
+  if (
+    normalized.includes("batch") &&
+    (normalized.includes("not support") ||
+      normalized.includes("not allowed") ||
+      normalized.includes("disabled") ||
+      normalized.includes("disallowed") ||
+      normalized.includes("unsupported") ||
+      normalized.includes("exceed") ||
+      normalized.includes("limit") ||
+      normalized.includes("invalid") ||
+      normalized.includes("forbidden") ||
+      normalized.includes("rejected"))
+  ) {
+    return true;
+  }
+  if (error.method === "batch") {
+    if (
+      error.statusCode === 400 ||
+      error.rpcCode === -32600 ||
+      error.rpcCode === -32601
+    ) {
+      return true;
+    }
+  }
+  return false;
+}

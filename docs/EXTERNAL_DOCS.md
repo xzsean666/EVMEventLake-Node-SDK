@@ -38,11 +38,18 @@ behavior depends on a major version.
   responsibilities into this SDK.
 - Verified: 2026-07-14.
 
-If a future task introduces a real runtime integration between these projects,
-document its protocol, version compatibility, and failure boundary in a new
-subsection here before implementation.
+### evm-call EVM Infrastructure Foundation (EVM 核心底座)
+
+- Repository: <https://github.com/xzsean666/evm-call>
+- Documentation: <https://github.com/xzsean666/evm-call/blob/main/README.md>
+- Relationship: Direct runtime foundation dependency ("EVM 核心底座").
+- Runtime dependency: Yes (`"evm-call": "github:xzsean666/evm-call"`).
+- Why used: Serves as the core resilient EVM RPC pool and log streaming engine, providing stepped backoff cooldowns, fast recovery, adaptive log range splitting (`getLogsChunked`, `iterateLogs`), JSON-RPC batching, and Multicall3 aggregated reads with block reorg detection.
+- SDK areas: `rpc`, `synchronization`.
+- Verified: 2026-09-16.
 
 ## 3. EVM Protocol and JSON-RPC
+
 
 ### Ethereum JSON-RPC API
 
@@ -295,7 +302,8 @@ Before merging a dependency or integration change:
 - State the owning module and relationship type.
 - Verify the URL is reachable.
 - Record the current date.
-- Update `ARCHITECTURE.md` if module boundaries change.
+- Update `docs/AI/ARCHITECTURE.md` if module boundaries change.
 - Update `SPEC.md` if observable behavior changes.
 - Update `BUILD.md` if installation, build, or runtime requirements change.
-- Update `nextsession.md` with progress and migration risks.
+- Update `docs/AI/SESSION_STATE.md` with progress and migration risks.
+

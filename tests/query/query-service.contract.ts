@@ -1,4 +1,4 @@
-import type { Address, Hex } from "viem";
+import { keccak256, stringToBytes, type Address, type Hex } from "viem";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -21,6 +21,15 @@ const abi = [
       { indexed: false, name: "value", type: "uint256" },
     ],
     name: "Transfer",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: "username", type: "string" },
+      { indexed: false, name: "bio", type: "string" },
+    ],
+    name: "UserRegistered",
     type: "event",
   },
 ] as const;
@@ -138,6 +147,102 @@ export function runQueryServiceContract(
         }),
       ).rejects.toBeInstanceOf(QueryValidationError);
     });
+
+    it("queries dynamic indexed string by plaintext and by topic hash", async () => {
+      await adapter.commitRange({
+        abiFingerprint: catalog.abiFingerprint,
+        endBlockHash: hex32(12),
+        fromBlock: 12n,
+        logs: [createUserRegisteredLog(12n, 0, "Alice", "Developer")],
+        targetKey: target.targetKey,
+        toBlock: 12n,
+      });
+
+      const byPlaintext = await queryService.findMany({
+        where: {
+          eventName: "UserRegistered",
+          indexedParameters: { username: "Alice" },
+        },
+      });
+      expect(byPlaintext.items).toHaveLength(1);
+      expect(byPlaintext.items[0]?.eventName).toBe("UserRegistered");
+      expect(byPlaintext.items[0]?.arguments).toEqual({
+        bio: "Developer",
+        username: "Alice",
+      });
+
+      const aliceHash = keccak256(stringToBytes("Alice")).toLowerCase();
+      const byHash = await queryService.findMany({
+        where: {
+          eventName: "UserRegistered",
+          indexedParameters: { username: aliceHash },
+        },
+      });
+      expect(byHash.items[0]?.transactionHash).toBe(
+        byPlaintext.items[0]?.transactionHash,
+      );
+      expect(byHash.items[0]?.logIndex).toBe(byPlaintext.items[0]?.logIndex);
+
+      const noMatch = await queryService.findMany({
+        where: {
+          eventName: "UserRegistered",
+          indexedParameters: { username: "Bob" },
+        },
+      });
+      expect(noMatch.items).toHaveLength(0);
+    });
+
+    it("queries unindexed parameters with index acceleration", async () => {
+      await adapter.commitRange({
+        abiFingerprint: catalog.abiFingerprint,
+        endBlockHash: hex32(12),
+        fromBlock: 12n,
+        logs: [createUserRegisteredLog(12n, 0, "Alice", "Developer")],
+        targetKey: target.targetKey,
+        toBlock: 12n,
+      });
+
+      const byBio = await queryService.findMany({
+        where: {
+          eventName: "UserRegistered",
+          unindexedParameters: { bio: "Developer" },
+        },
+      });
+      expect(byBio.items).toHaveLength(1);
+      expect(byBio.items[0]?.blockNumber).toBe(12n);
+
+      const byTransferValue = await queryService.findMany({
+        where: {
+          eventName: "Transfer",
+          unindexedParameters: { value: 20n },
+        },
+      });
+      expect(byTransferValue.items).toHaveLength(1);
+      expect(byTransferValue.items[0]?.blockNumber).toBe(11n);
+
+      const combined = await queryService.findMany({
+        where: {
+          eventName: "Transfer",
+          indexedParameters: {
+            to: "0x0000000000000000000000000000000000000002",
+          },
+          unindexedParameters: { value: 20n },
+        },
+      });
+      expect(combined.items).toHaveLength(1);
+      expect(combined.items[0]?.blockNumber).toBe(11n);
+
+      const mismatch = await queryService.findMany({
+        where: {
+          eventName: "Transfer",
+          indexedParameters: {
+            to: "0x0000000000000000000000000000000000000002",
+          },
+          unindexedParameters: { value: 999n },
+        },
+      });
+      expect(mismatch.items).toHaveLength(0);
+    });
   });
 }
 
@@ -206,4 +311,58 @@ function createTransferLog(
 
 function hex32(byte: number): Hex {
   return `0x${byte.toString(16).padStart(2, "0").repeat(32)}`;
+}
+
+function createUserRegisteredLog(
+  blockNumber: bigint,
+  logIndex: number,
+  username: string,
+  bio: string,
+): StoredEventLog {
+  const blockHash = hex32(Number(blockNumber));
+  const transactionHash = hex32(Number(blockNumber + 1n));
+  const usernameHash = keccak256(stringToBytes(username)).toLowerCase() as Hex;
+  return {
+    abiFingerprint: catalog.abiFingerprint,
+    blockHash,
+    blockNumber,
+    contractAddress,
+    data: "0x",
+    decodedArguments: encodeDecodedValue({ bio, username }),
+    decodeStatus: "decoded",
+    eventId: createStoredEventId({
+      blockHash,
+      logIndex,
+      targetKey: target.targetKey,
+      transactionHash,
+    }),
+    eventName: "UserRegistered",
+    eventSignature: "UserRegistered(string,string)",
+    logIndex,
+    parameters: [
+      {
+        comparableValue: encodeDecodedValue(usernameHash),
+        indexed: true,
+        name: "username",
+        position: 0,
+        rawTopicValue: usernameHash,
+        solidityType: "string",
+        value: username,
+      },
+      {
+        comparableValue: encodeDecodedValue(bio),
+        indexed: false,
+        name: "bio",
+        position: 1,
+        rawTopicValue: null,
+        solidityType: "string",
+        value: bio,
+      },
+    ],
+    removed: false,
+    targetKey: target.targetKey,
+    topics: [hex32(4), usernameHash],
+    transactionHash,
+    transactionIndex: 0,
+  };
 }

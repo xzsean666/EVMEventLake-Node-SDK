@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EVMEventLake Browser IndexedDB Example</title>
+    <style>
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+          Arial, sans-serif;
+        max-width: 900px;
+        margin: 40px auto;
+        padding: 0 20px;
+        line-height: 1.6;
+        color: #1a1a1a;
+      }
+      h1 {
+        margin-bottom: 8px;
+      }
+      .badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 4px;
+        background: #eef2ff;
+        color: #4338ca;
+        font-size: 14px;
+        font-weight: 500;
+        margin-bottom: 24px;
+      }
+      .card {
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        background: #fafafa;
+      }
+      button {
+        background: #4f46e5;
+        color: white;
+        border: none;
+        padding: 10px 18px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        margin-right: 8px;
+        margin-bottom: 8px;
+      }
+      button:hover {
+        background: #4338ca;
+      }
+      button:disabled {
+        background: #9ca3af;
+        cursor: not-allowed;
+      }
+      pre {
+        background: #111827;
+        color: #f3f4f6;
+        padding: 16px;
+        border-radius: 6px;
+        overflow-x: auto;
+        font-size: 13px;
+      }
+      .status-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
+        margin-top: 12px;
+      }
+      .status-item {
+        background: white;
+        padding: 12px;
+        border-radius: 6px;
+        border: 1px solid #e5e7eb;
+      }
+      .status-item .label {
+        font-size: 12px;
+        color: #6b7280;
+        text-transform: uppercase;
+      }
+      .status-item .value {
+        font-size: 18px;
+        font-weight: 600;
+        color: #111827;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>EVMEventLake Browser dApp</h1>
+    <div class="badge">Isomorphic Client + IndexedDB Driver</div>
+
+    <p>
+      This demo showcases the EVMEventLake TypeScript SDK running natively in the
+      browser using <code>idb://uniswap-v3-usdc-eth</code>. It uses the exact same
+      API as the Node.js backend.
+    </p>
+
+    <div class="card">
+      <h3>1. Client Control</h3>
+      <button id="btn-init">1. Initialize Client</button>
+      <button id="btn-status" disabled>2. Refresh Status</button>
+      <button id="btn-sync" disabled>3. Sync 10 Blocks (update)</button>
+      <button id="btn-query" disabled>4. Query Events (Offline)</button>
+      <button id="btn-close" disabled>5. Close Client</button>
+
+      <div class="status-grid">
+        <div class="status-item">
+          <div class="label">Start Block</div>
+          <div class="value" id="val-start-block">-</div>
+        </div>
+        <div class="status-item">
+          <div class="label">Next Block</div>
+          <div class="value" id="val-next-block">-</div>
+        </div>
+        <div class="status-item">
+          <div class="label">Synced Through</div>
+          <div class="value" id="val-synced-through">-</div>
+        </div>
+        <div class="status-item">
+          <div class="label">Has Active Lease</div>
+          <div class="value" id="val-has-lease">-</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Console Output</h3>
+      <pre id="output">Click "Initialize Client" to start...</pre>
+    </div>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

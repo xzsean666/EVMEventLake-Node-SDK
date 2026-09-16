@@ -30,6 +30,7 @@ export interface StoredEventLog {
 export interface StoredEventQuery {
   readonly after?: StoredEventQueryCursor;
   readonly blockNumber?: bigint;
+  readonly decodeStatus?: StoredDecodeStatus;
   readonly eventName?: string;
   readonly eventSignature?: string;
   readonly fromBlock?: bigint;
@@ -39,12 +40,15 @@ export interface StoredEventQuery {
   readonly targetKey: string;
   readonly toBlock?: bigint;
   readonly transactionHash?: Hex;
+  readonly unindexedParameters?: readonly StoredParameterFilter[];
 }
 
-export interface StoredIndexedParameterFilter {
+export interface StoredParameterFilter {
   readonly comparableValue: string;
   readonly name: string;
 }
+
+export type StoredIndexedParameterFilter = StoredParameterFilter;
 
 export interface StoredEventQueryCursor {
   readonly blockNumber: bigint;
@@ -97,6 +101,36 @@ export interface CommitRangeResult {
 export interface RewindResult {
   readonly deletedLogs: number;
   readonly nextBlock: bigint;
+}
+
+export interface RedecodeCursor {
+  readonly blockNumber: bigint;
+  readonly logIndex: number;
+}
+
+export interface CountLogsForRedecodeRequest {
+  readonly fromBlock?: bigint;
+  readonly redecodeAll?: boolean;
+  readonly targetKey: string;
+  readonly toBlock?: bigint;
+}
+
+export interface GetLogsForRedecodeRequest {
+  readonly after?: RedecodeCursor;
+  readonly fromBlock?: bigint;
+  readonly limit: number;
+  readonly redecodeAll?: boolean;
+  readonly targetKey: string;
+  readonly toBlock?: bigint;
+}
+
+export interface UpdateDecodedLogsRequest {
+  readonly logs: readonly StoredEventLog[];
+  readonly targetKey: string;
+}
+
+export interface UpdateDecodedLogsResult {
+  readonly updatedLogs: number;
 }
 
 export function createStoredEventId(input: {

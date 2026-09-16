@@ -78,6 +78,72 @@ export function normalizeBlockNumber(
   return value;
 }
 
+function isWindowsDrivePath(path: string): boolean {
+  return /^[a-zA-Z]:[/\\]/.test(path);
+}
+
+function normalizeSqlitePath(databaseUrl: string): string {
+  if (
+    databaseUrl === ":memory:" ||
+    databaseUrl === "sqlite::memory:" ||
+    databaseUrl === "sqlite://:memory:" ||
+    databaseUrl === "file::memory:"
+  ) {
+    return ":memory:";
+  }
+
+  let rawLocation = databaseUrl;
+  if (rawLocation.startsWith("sqlite:")) {
+    rawLocation = rawLocation.slice("sqlite:".length);
+  } else if (rawLocation.startsWith("file:")) {
+    rawLocation = rawLocation.slice("file:".length);
+  }
+
+  if (
+    rawLocation === "" ||
+    rawLocation.includes("?") ||
+    rawLocation.includes("#")
+  ) {
+    throw new UnsupportedDatabaseUrlError(
+      "SQLite URL must contain a file path without query or fragment",
+      { context: { database: redactUrl(databaseUrl) } },
+    );
+  }
+
+  try {
+    rawLocation = decodeURI(rawLocation);
+  } catch {
+    // Keep rawLocation if decodeURI fails on malformed percent encoding
+  }
+
+  if (rawLocation.startsWith("//")) {
+    rawLocation = rawLocation.slice(2);
+  }
+
+  // Windows drive with leading slash (e.g. /C:/data.db or /C:\data.db)
+  if (/^\/[a-zA-Z]:[/\\]/.test(rawLocation)) {
+    rawLocation = rawLocation.slice(1);
+  }
+
+  if (
+    rawLocation === "" ||
+    rawLocation === "/" ||
+    rawLocation === "\\" ||
+    rawLocation === "."
+  ) {
+    throw new UnsupportedDatabaseUrlError(
+      "SQLite URL must contain a file path without query or fragment",
+      { context: { database: redactUrl(databaseUrl) } },
+    );
+  }
+
+  if (rawLocation.startsWith("/") || isWindowsDrivePath(rawLocation)) {
+    return rawLocation;
+  }
+
+  return resolve(process.cwd(), rawLocation);
+}
+
 export function parseDatabaseConfiguration(
   databaseUrl: string,
 ): DatabaseConfiguration {
@@ -85,23 +151,56 @@ export function parseDatabaseConfiguration(
     throw new UnsupportedDatabaseUrlError("database must be a non-empty URL");
   }
 
-  if (databaseUrl.startsWith("sqlite://")) {
-    const sqliteLocation = databaseUrl.slice("sqlite://".length);
+  if (
+    databaseUrl.startsWith("idb://") ||
+    databaseUrl.startsWith("indexeddb://")
+  ) {
+    const prefix = databaseUrl.startsWith("idb://") ? "idb://" : "indexeddb://";
+    const databaseName = databaseUrl.slice(prefix.length);
     if (
-      sqliteLocation === "" ||
-      sqliteLocation.includes("?") ||
-      sqliteLocation.includes("#")
+      databaseName === "" ||
+      databaseName.includes("?") ||
+      databaseName.includes("#") ||
+      databaseName.includes("/") ||
+      databaseName.includes("\\") ||
+      databaseName.trim() !== databaseName
     ) {
       throw new UnsupportedDatabaseUrlError(
-        "SQLite URL must contain a file path without query or fragment",
+        "IndexedDB URL must contain a valid database name without path separators, query, or fragment",
         { context: { database: redactUrl(databaseUrl) } },
       );
     }
-
     return Object.freeze({
-      filename: sqliteLocation.startsWith("/")
-        ? sqliteLocation
-        : resolve(process.cwd(), sqliteLocation),
+      databaseName,
+      kind: "indexeddb" as const,
+    });
+  }
+
+  if (
+    databaseUrl === ":memory:" ||
+    databaseUrl.startsWith("sqlite:") ||
+    databaseUrl.startsWith("file:")
+  ) {
+    return Object.freeze({
+      filename: normalizeSqlitePath(databaseUrl),
+      kind: "sqlite" as const,
+    });
+  }
+
+  const isWindowsAbsolute = isWindowsDrivePath(databaseUrl);
+  const isPosixAbsolute = databaseUrl.startsWith("/");
+  const isExplicitRelative =
+    databaseUrl.startsWith("./") || databaseUrl.startsWith("../");
+  const hasUriScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(databaseUrl);
+
+  if (
+    isWindowsAbsolute ||
+    isPosixAbsolute ||
+    isExplicitRelative ||
+    !hasUriScheme
+  ) {
+    return Object.freeze({
+      filename: normalizeSqlitePath(databaseUrl),
       kind: "sqlite" as const,
     });
   }
@@ -121,7 +220,7 @@ export function parseDatabaseConfiguration(
     parsedUrl.protocol !== "postgresql:"
   ) {
     throw new UnsupportedDatabaseUrlError(
-      "database URL must use sqlite, postgres, or postgresql",
+      "database URL must use sqlite, postgres, postgresql, idb, or indexeddb",
       { context: { database: redactUrl(databaseUrl) } },
     );
   }
@@ -247,6 +346,11 @@ function normalizeRpcPolicy(
   policy: RpcPolicyOptions = {},
 ): NormalizedRpcPolicy {
   return Object.freeze({
+    batchSize: normalizePositiveInteger(
+      policy.batchSize,
+      DEFAULT_RPC_POLICY.batchSize,
+      "rpc.batchSize",
+    ),
     endpointCooldownMs: normalizePositiveInteger(
       policy.endpointCooldownMs,
       DEFAULT_RPC_POLICY.endpointCooldownMs,
@@ -350,6 +454,14 @@ export function validateSdkOptions(
 }
 
 export function redactUrl(rawUrl: string): string {
+  if (
+    rawUrl === ":memory:" ||
+    rawUrl === "sqlite::memory:" ||
+    rawUrl === "sqlite://:memory:" ||
+    rawUrl === "file::memory:"
+  ) {
+    return rawUrl;
+  }
   try {
     const parsedUrl = new URL(rawUrl);
     parsedUrl.username = "";

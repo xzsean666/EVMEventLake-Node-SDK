@@ -16,6 +16,7 @@ export interface SynchronizationPolicyOptions {
 }
 
 export interface RpcPolicyOptions {
+  readonly batchSize?: number;
   readonly endpointCooldownMs?: number;
   readonly maximumTimeoutSplitsPerRange?: number;
   readonly maxRetriesPerEndpoint?: number;
@@ -49,8 +50,15 @@ export interface PostgresqlDatabaseConfiguration {
   readonly kind: "postgresql";
 }
 
+export interface IndexeddbDatabaseConfiguration {
+  readonly databaseName: string;
+  readonly kind: "indexeddb";
+}
+
 export type DatabaseConfiguration =
-  PostgresqlDatabaseConfiguration | SqliteDatabaseConfiguration;
+  | IndexeddbDatabaseConfiguration
+  | PostgresqlDatabaseConfiguration
+  | SqliteDatabaseConfiguration;
 
 export interface NormalizedSynchronizationPolicy {
   readonly confirmations: number;
@@ -61,6 +69,7 @@ export interface NormalizedSynchronizationPolicy {
 }
 
 export interface NormalizedRpcPolicy {
+  readonly batchSize: number;
   readonly endpointCooldownMs: number;
   readonly maximumTimeoutSplitsPerRange: number;
   readonly maxRetriesPerEndpoint: number;
@@ -89,6 +98,7 @@ export const DEFAULT_SYNCHRONIZATION_POLICY: NormalizedSynchronizationPolicy =
   });
 
 export const DEFAULT_RPC_POLICY: NormalizedRpcPolicy = Object.freeze({
+  batchSize: 1,
   endpointCooldownMs: 30_000,
   maximumTimeoutSplitsPerRange: 2,
   maxRetriesPerEndpoint: 2,

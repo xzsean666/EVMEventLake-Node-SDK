@@ -52,13 +52,26 @@ describe("indexed query value validation", () => {
       queryService.findMany({
         where: {
           eventName: "IndexedValues",
-          indexedParameters: { label: "plain text" },
+          indexedParameters: { label: 123 },
         },
       }),
     ).rejects.toBeInstanceOf(QueryValidationError);
   });
 
-  it("accepts ABI-valid indexed values", async () => {
+  it("accepts ABI-valid indexed values including plaintext dynamic parameters", async () => {
+    await expect(
+      queryService.findMany({
+        where: {
+          eventName: "IndexedValues",
+          indexedParameters: {
+            label: "plain text",
+            tag: "0x01020304",
+            value: 255,
+          },
+        },
+      }),
+    ).resolves.toEqual({ items: [], nextCursor: null });
+
     await expect(
       queryService.findMany({
         where: {

@@ -27,9 +27,10 @@ explicit public license remain release decisions.
 | pnpm | 10.12.1 | Development and consumer examples |
 | viem | 2.55.2 | HTTP EVM RPC and ABI primitives |
 | Kysely | 0.29.3 | Typed SQL construction and dialect boundary |
-| better-sqlite3 | 12.11.1 | SQLite adapter |
-| pg | 8.22.0 | PostgreSQL adapter |
-| Vitest | 4.1.10 | Unit and integration tests |
+| better-sqlite3 | 12.11.1 | SQLite adapter (Node.js) |
+| pg | 8.22.0 | PostgreSQL adapter (Node.js) |
+| fake-indexeddb | 6.2.5 | In-memory IndexedDB runtime for testing |
+| Vitest | 4.1.10 | Unit, integration, and storage parity tests |
 
 The exact versions are pinned in `package.json` and `pnpm-lock.yaml`.
 
@@ -162,20 +163,40 @@ contract.
 Use SQLite for local applications, scripts, tests, and low-concurrency embedded
 workloads.
 
-Relative database URL:
+Relative database URLs (resolved against `process.cwd()`):
 
 ```text
 sqlite://events.db
+sqlite:events.db
+./events.db
 ```
 
-Absolute database URL:
+Absolute POSIX database URLs:
 
 ```text
 sqlite:///var/lib/my-application/events.db
+sqlite:/var/lib/my-application/events.db
+/var/lib/my-application/events.db
 ```
 
-The SQLite file may be created by SDK initialization. Its parent directory must
-already exist and be writable by the application process.
+Windows drive database URLs:
+
+```text
+sqlite:///C:/data/events.db
+sqlite:C:\data\events.db
+C:\data\events.db
+```
+
+Ephemeral in-memory SQLite database:
+
+```text
+:memory:
+sqlite::memory:
+sqlite://:memory:
+```
+
+The SQLite persistent file may be created by SDK initialization. Its parent directory must
+already exist and be writable by the application process (in-memory mode requires no directory).
 
 ### 6.2 PostgreSQL
 
@@ -191,13 +212,29 @@ postgresql://eventlake:password@127.0.0.1:5432/eventlake
 The database and user must exist before SDK creation. The SDK owns its tables
 and migrations but does not provision the PostgreSQL server or database.
 
-### 6.3 Migrations
+### 6.3 IndexedDB (Browser & Frontend dApps)
+
+Use IndexedDB for frontend web applications, browser dApps, and offline-first
+client caches.
+
+URL forms:
+
+```text
+idb://uniswap-v3-pool
+indexeddb://base-usdc-lake
+```
+
+IndexedDB storage requires no Node.js C++ bindings. Storage drivers are loaded
+dynamically via asynchronous imports (`await import(...)`), allowing clean bundling
+with Vite, Webpack, or Rollup without polyfill errors.
+
+### 6.4 Migrations
 
 SDK creation applies required forward migrations before returning.
 
 - Migration failure stops creation.
 - Migrations do not silently delete event data.
-- SQLite and PostgreSQL migration histories remain behaviorally aligned.
+- SQLite, PostgreSQL, and IndexedDB migration histories remain behaviorally aligned.
 - A future breaking schema migration requires release notes and a tested upgrade
   path.
 
@@ -400,6 +437,7 @@ pnpm run test:unit
 pnpm run test:storage:sqlite
 pnpm run test:storage:postgresql
 pnpm run test:storage:postgresql:real
+pnpm run test:storage:indexeddb
 pnpm run test:integration
 pnpm run test:git-install
 pnpm run test:github-install

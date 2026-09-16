@@ -263,15 +263,25 @@ if (status.syncedThroughBlock !== null) {
 
 ## Storage Options
 
-- **SQLite**: `sqlite://events.db` or `sqlite:///var/data/events.db` (single-process / embedded).
+- **SQLite**: `sqlite://events.db` or `sqlite:///var/data/events.db` (single-process / embedded Node.js).
 - **PostgreSQL**: `postgresql://user:password@host:5432/database` (multi-process / shared database with distributed lease).
+- **IndexedDB**: `idb://my-lake` or `indexeddb://my-lake` (browser dApps, frontend SPAs, offline client cache).
 
 ---
 
 ## Documentation
 
 - [Examples Directory (`examples/`)](./examples/README.md)
-- [Architecture Guide (`docs/ARCHITECTURE.md`)](docs/ARCHITECTURE.md)
+- [Architecture Guide (`docs/AI/ARCHITECTURE.md`)](docs/AI/ARCHITECTURE.md)
 - [Specification (`docs/SPEC.md`)](docs/SPEC.md)
 - [Build & Verification (`docs/BUILD.md`)](docs/BUILD.md)
 - [External Dependencies (`docs/EXTERNAL_DOCS.md`)](docs/EXTERNAL_DOCS.md)
+- [AI Agent Roadmap & Tasks (`docs/AI/TASK_INDEX.md`)](docs/AI/TASK_INDEX.md)
+
+---
+
+## License
+
+[MIT License](LICENSE) © 2026 EVMEventLake Contributors
+
+

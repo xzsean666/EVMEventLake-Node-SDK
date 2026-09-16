@@ -1,3 +1,4 @@
+import { normalizeEvmLog, sortEvmLogs } from "evm-call";
 import { isAddress, type Address, type Hex } from "viem";
 
 import type { NormalizedRpcPolicy } from "../configuration/sdk-options.js";
@@ -11,6 +12,7 @@ import {
 import { HttpEvmRpcClient, type RpcTransport } from "./evm-rpc-client.js";
 import { RpcEndpoint } from "./rpc-endpoint.js";
 import {
+  isRpcBatchRejection,
   RpcRequestFailure,
   type RpcFailureCategory,
 } from "./rpc-error-classifier.js";
@@ -37,6 +39,23 @@ export interface RpcLogsResult {
   readonly endpointIdentity: string;
   readonly endpointUrl: string;
   readonly logs: readonly RpcLog[];
+}
+
+export interface LogRangeQuery {
+  readonly fromBlock: bigint;
+  readonly toBlock: bigint;
+}
+
+export interface RpcLogBatchItemResult {
+  readonly fromBlock: bigint;
+  readonly logs: readonly RpcLog[];
+  readonly toBlock: bigint;
+}
+
+export interface RpcLogsBatchResult {
+  readonly endpointIdentity: string;
+  readonly endpointUrl: string;
+  readonly items: readonly RpcLogBatchItemResult[];
 }
 
 export interface RpcPoolMetrics {
@@ -106,12 +125,12 @@ export class RpcPool {
     dependencies: RpcPoolDependencies = {},
   ) {
     this.#chainId = chainId;
+    this.#now = dependencies.now ?? Date.now;
     this.#endpoints = Object.freeze(
-      rpcUrls.map((rpcUrl) => new RpcEndpoint(rpcUrl)),
+      rpcUrls.map((rpcUrl) => new RpcEndpoint(rpcUrl, this.#now)),
     );
     this.#policy = policy;
     this.#transport = dependencies.transport ?? new HttpEvmRpcClient();
-    this.#now = dependencies.now ?? Date.now;
     this.#sleep = dependencies.sleep ?? sleepWithCancellation;
   }
 
@@ -191,6 +210,203 @@ export class RpcPool {
     });
   }
 
+  public async fetchLogsBatch(
+    contractAddress: Address,
+    ranges: readonly LogRangeQuery[],
+    options: FetchLogsOptions = {},
+  ): Promise<RpcLogsBatchResult> {
+    if (ranges.length === 0) {
+      return Object.freeze({
+        endpointIdentity: "",
+        endpointUrl: "",
+        items: Object.freeze([]),
+      });
+    }
+
+    if (
+      ranges.length === 1 ||
+      this.#policy.batchSize <= 1 ||
+      typeof this.#transport.requestBatch !== "function"
+    ) {
+      return this.#fetchLogsBatchSequentially(contractAddress, ranges, options);
+    }
+
+    const endpoints = this.#orderedAvailableEndpoints(
+      options.preferredEndpointIdentity,
+    );
+    if (endpoints.length === 0) {
+      throw new NoValidRpcEndpointError(
+        "No RPC endpoint is currently available",
+        {
+          context: {
+            endpoints: this.#endpoints.map((endpoint) =>
+              redactUrl(endpoint.url),
+            ),
+          },
+        },
+      );
+    }
+
+    let lastFailure: unknown;
+    for (const [endpointIndex, endpoint] of endpoints.entries()) {
+      if (endpointIndex > 0) this.#endpointFailovers += 1;
+      if (!endpoint.batchSupported) {
+        return this.#fetchLogsBatchSequentially(
+          contractAddress,
+          ranges,
+          options,
+          endpoint.identity,
+        );
+      }
+
+      try {
+        await this.#validateEndpoint(endpoint, options.signal);
+        const subRequests = ranges.map((range) => ({
+          method: "eth_getLogs",
+          params: [
+            {
+              address: contractAddress,
+              fromBlock: toHexQuantity(range.fromBlock),
+              toBlock: toHexQuantity(range.toBlock),
+            },
+          ],
+        }));
+
+        this.#requestCount += 1;
+        const batchResults = await this.#transport.requestBatch({
+          endpointUrl: endpoint.url,
+          requests: subRequests,
+          requestTimeoutMs: this.#policy.requestTimeoutMs,
+          ...(options.signal === undefined ? {} : { signal: options.signal }),
+        });
+
+        for (const item of batchResults) {
+          if (!item.ok) {
+            if (isRpcBatchRejection(item.error)) {
+              endpoint.batchSupported = false;
+              return this.#fetchLogsBatchSequentially(
+                contractAddress,
+                ranges,
+                options,
+                endpoint.identity,
+              );
+            }
+            throw item.error;
+          }
+        }
+
+        const items: RpcLogBatchItemResult[] = [];
+        for (let i = 0; i < ranges.length; i++) {
+          const range = ranges[i];
+          const itemResult = batchResults[i];
+          if (
+            range === undefined ||
+            itemResult === undefined ||
+            !itemResult.ok
+          ) {
+            throw new RpcRequestFailure(
+              "Batch item result is missing or invalid",
+              {
+                category: "invalid_response",
+                endpointUrl: endpoint.url,
+                method: "eth_getLogs",
+              },
+            );
+          }
+          const logs = parseRpcLogs(itemResult.result);
+          items.push(
+            Object.freeze({
+              fromBlock: range.fromBlock,
+              logs,
+              toBlock: range.toBlock,
+            }),
+          );
+        }
+
+        endpoint.recordSuccess();
+        return Object.freeze({
+          endpointIdentity: endpoint.identity,
+          endpointUrl: redactUrl(endpoint.url),
+          items: Object.freeze(items),
+        });
+      } catch (error) {
+        if (error instanceof OperationCancelledError) throw error;
+        if (isRpcBatchRejection(error)) {
+          endpoint.batchSupported = false;
+          return this.#fetchLogsBatchSequentially(
+            contractAddress,
+            ranges,
+            options,
+            endpoint.identity,
+          );
+        }
+        if (
+          error instanceof RpcRequestFailure &&
+          error.category === "range_limit"
+        ) {
+          throw error;
+        }
+
+        lastFailure = error;
+        const cooldownMs =
+          error instanceof RpcRequestFailure && error.retryAfterMs !== undefined
+            ? Math.min(error.retryAfterMs, MAX_RETRY_DELAY_MS)
+            : this.#policy.endpointCooldownMs;
+        endpoint.markCoolingDown(this.#now(), cooldownMs);
+      }
+    }
+
+    throw new RpcRequestExhaustedError(
+      "All RPC endpoints failed during batch request",
+      {
+        cause: lastFailure,
+        context: {
+          batchSize: ranges.length,
+          endpoints: this.#endpoints.map((endpoint) => redactUrl(endpoint.url)),
+        },
+      },
+    );
+  }
+
+  async #fetchLogsBatchSequentially(
+    contractAddress: Address,
+    ranges: readonly LogRangeQuery[],
+    options: FetchLogsOptions,
+    preferredEndpointIdentity?: string,
+  ): Promise<RpcLogsBatchResult> {
+    const items: RpcLogBatchItemResult[] = [];
+    let endpointIdentity = "";
+    let endpointUrl = "";
+
+    for (const range of ranges) {
+      const single = await this.fetchLogs(
+        contractAddress,
+        range.fromBlock,
+        range.toBlock,
+        {
+          ...(preferredEndpointIdentity === undefined
+            ? options
+            : { ...options, preferredEndpointIdentity }),
+        },
+      );
+      endpointIdentity = single.endpointIdentity;
+      endpointUrl = single.endpointUrl;
+      items.push(
+        Object.freeze({
+          fromBlock: range.fromBlock,
+          logs: single.logs,
+          toBlock: range.toBlock,
+        }),
+      );
+    }
+
+    return Object.freeze({
+      endpointIdentity,
+      endpointUrl,
+      items: Object.freeze(items),
+    });
+  }
+
   async #requestWithFailover<Value>(
     method: string,
     params: readonly unknown[],
@@ -228,7 +444,9 @@ export class RpcPool {
           options,
         );
         try {
-          return Object.freeze({ endpoint, value: parseResult(rawValue) });
+          const value = parseResult(rawValue);
+          endpoint.recordSuccess();
+          return Object.freeze({ endpoint, value });
         } catch (cause) {
           throw new RpcRequestFailure("RPC result failed validation", {
             category: "invalid_response",
@@ -409,45 +627,58 @@ function parseRpcLogs(value: unknown): readonly RpcLog[] {
       `RPC logs result exceeds the maximum allowed entries of ${MAX_LOG_ENTRIES}`,
     );
   }
+  const parsed = value.map((logValue) => {
+    const log = assertRecord(logValue, "event log");
+    if (!Array.isArray(log.topics)) {
+      throw new TypeError("RPC log topics must be an array");
+    }
+    if (log.topics.length > MAX_LOG_TOPICS) {
+      throw new TypeError(
+        `RPC log must not contain more than ${MAX_LOG_TOPICS} topics`,
+      );
+    }
+    const address = assertHexBytes(log.address, "log address", 20);
+    if (!isAddress(address, { strict: false })) {
+      throw new TypeError("RPC log address must be a 20-byte EVM address");
+    }
+    if (typeof log.removed !== "boolean") {
+      throw new TypeError("RPC log removed flag must be boolean");
+    }
+    return normalizeEvmLog({
+      address,
+      blockHash: assertHexBytes(log.blockHash, "log block hash", 32),
+      blockNumber: parseHexQuantity(log.blockNumber),
+      data: assertHexData(log.data, "log data", MAX_LOG_DATA_BYTES),
+      logIndex: parseRpcIndex(log.logIndex, "log index"),
+      removed: log.removed,
+      topics: log.topics.map((topic) => assertHexBytes(topic, "log topic", 32)),
+      transactionHash: assertHexBytes(
+        log.transactionHash,
+        "transaction hash",
+        32,
+      ),
+      transactionIndex: parseRpcIndex(
+        log.transactionIndex,
+        "transaction index",
+      ),
+    });
+  });
+
+  const sorted = sortEvmLogs(parsed);
   return Object.freeze(
-    value.map((logValue) => {
-      const log = assertRecord(logValue, "event log");
-      if (!Array.isArray(log.topics)) {
-        throw new TypeError("RPC log topics must be an array");
-      }
-      if (log.topics.length > MAX_LOG_TOPICS) {
-        throw new TypeError(
-          `RPC log must not contain more than ${MAX_LOG_TOPICS} topics`,
-        );
-      }
-      const address = assertHexBytes(log.address, "log address", 20);
-      if (!isAddress(address, { strict: false })) {
-        throw new TypeError("RPC log address must be a 20-byte EVM address");
-      }
-      if (typeof log.removed !== "boolean") {
-        throw new TypeError("RPC log removed flag must be boolean");
-      }
-      return Object.freeze({
-        address,
-        blockHash: assertHexBytes(log.blockHash, "log block hash", 32),
-        blockNumber: parseHexQuantity(log.blockNumber),
-        data: assertHexData(log.data, "log data", MAX_LOG_DATA_BYTES),
-        logIndex: parseRpcIndex(log.logIndex, "log index"),
-        removed: log.removed,
-        topics: Object.freeze(
-          log.topics.map((topic) => assertHexBytes(topic, "log topic", 32)),
-        ),
-        transactionHash: assertHexBytes(
-          log.transactionHash,
-          "transaction hash",
-          32,
-        ),
-        transactionIndex: parseRpcIndex(
-          log.transactionIndex,
-          "transaction index",
-        ),
-      });
-    }),
+    sorted.map((evmLog) =>
+      Object.freeze({
+        address: evmLog.address.toLowerCase() as Address,
+        blockHash: evmLog.blockHash.toLowerCase() as Hex,
+        blockNumber: evmLog.blockNumber,
+        data: evmLog.data.toLowerCase() as Hex,
+        logIndex: evmLog.logIndex,
+        removed: evmLog.removed ?? false,
+        topics: Object.freeze(evmLog.topics.map((t) => t.toLowerCase() as Hex)),
+        transactionHash: evmLog.transactionHash.toLowerCase() as Hex,
+        transactionIndex: evmLog.transactionIndex,
+      }),
+    ),
   );
 }
 

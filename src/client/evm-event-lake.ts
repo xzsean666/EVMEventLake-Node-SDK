@@ -17,6 +17,11 @@ import type {
 import { RpcPool } from "../rpc/rpc-pool.js";
 import { createStorageAdapter } from "../storage/create-storage-adapter.js";
 import type { StorageAdapter } from "../storage/storage-adapter.js";
+import {
+  RedecodeService,
+  type RedecodeOptions,
+  type RedecodeResult,
+} from "../synchronization/redecode-service.js";
 import type {
   UpdateOptions,
   UpdateResult,
@@ -29,20 +34,23 @@ export class EVMEventLake {
 
   readonly #lifecycleAbortController = new AbortController();
   readonly #queryService: EventQueryService;
+  readonly #redecodeService: RedecodeService;
   readonly #storage: StorageAdapter;
   readonly #targetKey: string;
   readonly #updateService: UpdateService;
-  #activeUpdate: Promise<UpdateResult> | null = null;
+  #activeOperation: Promise<unknown> | null = null;
   #closePromise: Promise<void> | null = null;
   #closed = false;
 
   private constructor(input: {
     readonly queryService: EventQueryService;
+    readonly redecodeService: RedecodeService;
     readonly storage: StorageAdapter;
     readonly targetKey: string;
     readonly updateService: UpdateService;
   }) {
     this.#queryService = input.queryService;
+    this.#redecodeService = input.redecodeService;
     this.#storage = input.storage;
     this.#targetKey = input.targetKey;
     this.#updateService = input.updateService;
@@ -68,7 +76,7 @@ export class EVMEventLake {
       startBlock: normalized.startBlock,
     });
     const catalog = new EventCatalog(normalized.abi);
-    const storage = createStorageAdapter(normalized.database);
+    const storage = await createStorageAdapter(normalized.database);
     try {
       await storage.initialize();
       await storage.registerTarget({
@@ -96,6 +104,13 @@ export class EVMEventLake {
         synchronizationPolicy: normalized.synchronization,
         target,
       });
+      const redecodeService = new RedecodeService({
+        ...(normalized.observability.logger === undefined
+          ? {}
+          : { logger: normalized.observability.logger }),
+        storage,
+        target,
+      });
       emitLogSafely(normalized.observability.logger, {
         event: "sdk_initialized",
         level: "info",
@@ -104,6 +119,7 @@ export class EVMEventLake {
       });
       return new EVMEventLake({
         queryService,
+        redecodeService,
         storage,
         targetKey: target.targetKey,
         updateService,
@@ -116,9 +132,9 @@ export class EVMEventLake {
 
   public async update(options: UpdateOptions = {}): Promise<UpdateResult> {
     this.#assertOpen();
-    if (this.#activeUpdate !== null) {
+    if (this.#activeOperation !== null) {
       throw new SynchronizationLockedError(
-        "This SDK instance already has an active update",
+        "This SDK instance already has an active update or redecode operation",
         { context: { targetKey: this.#targetKey } },
       );
     }
@@ -130,11 +146,49 @@ export class EVMEventLake {
             this.#lifecycleAbortController.signal,
           ]);
     const updatePromise = this.#updateService.update({ ...options, signal });
-    this.#activeUpdate = updatePromise;
+    this.#activeOperation = updatePromise;
     try {
       return await updatePromise;
     } finally {
-      if (this.#activeUpdate === updatePromise) this.#activeUpdate = null;
+      if (this.#activeOperation === updatePromise) this.#activeOperation = null;
+    }
+  }
+
+  public async redecode(options: RedecodeOptions): Promise<RedecodeResult> {
+    this.#assertOpen();
+    if (this.#activeOperation !== null) {
+      throw new SynchronizationLockedError(
+        "This SDK instance already has an active update or redecode operation",
+        { context: { targetKey: this.#targetKey } },
+      );
+    }
+    const signal =
+      options.signal === undefined
+        ? this.#lifecycleAbortController.signal
+        : AbortSignal.any([
+            options.signal,
+            this.#lifecycleAbortController.signal,
+          ]);
+
+    const newCatalog = new EventCatalog(options.abi);
+    const redecodePromise = (async () => {
+      const result = await this.#redecodeService.redecode(newCatalog, {
+        ...options,
+        signal,
+      });
+      this.#queryService.setCatalog(
+        this.#queryService.catalog.merge(newCatalog),
+      );
+      return result;
+    })();
+
+    this.#activeOperation = redecodePromise;
+    try {
+      return await redecodePromise;
+    } finally {
+      if (this.#activeOperation === redecodePromise) {
+        this.#activeOperation = null;
+      }
     }
   }
 
@@ -156,7 +210,7 @@ export class EVMEventLake {
   }
 
   async #closeResources(): Promise<void> {
-    await this.#activeUpdate?.catch(() => undefined);
+    await this.#activeOperation?.catch(() => undefined);
     await this.#storage.close();
   }
 

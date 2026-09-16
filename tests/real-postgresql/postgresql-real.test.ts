@@ -78,6 +78,9 @@ async function createIsolatedPostgresqlAdapter(
     renewLease: (request) => adapter.renewLease(request),
     rewind: (targetKey, rewindToBlock) =>
       adapter.rewind(targetKey, rewindToBlock),
+    countLogsForRedecode: (request) => adapter.countLogsForRedecode(request),
+    getLogsForRedecode: (request) => adapter.getLogsForRedecode(request),
+    updateDecodedLogs: (request) => adapter.updateDecodedLogs(request),
   };
   return isolatedAdapter;
 }

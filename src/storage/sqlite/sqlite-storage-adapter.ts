@@ -11,12 +11,14 @@ import type { StorageDatabaseSchema } from "../storage-database-schema.js";
 export function createSqliteStorageAdapter(
   filename: string,
 ): SqlStorageAdapter {
-  const parentDirectory = dirname(filename);
-  if (!existsSync(parentDirectory)) {
-    throw new StorageInitializationError(
-      "SQLite parent directory does not exist",
-      { context: { parentDirectory } },
-    );
+  if (filename !== ":memory:") {
+    const parentDirectory = dirname(filename);
+    if (!existsSync(parentDirectory)) {
+      throw new StorageInitializationError(
+        "SQLite parent directory does not exist",
+        { context: { parentDirectory } },
+      );
+    }
   }
 
   let sqliteDatabase: Database.Database;

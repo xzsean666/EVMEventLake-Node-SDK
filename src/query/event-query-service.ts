@@ -1,4 +1,11 @@
-import { getAddress, isAddress, isHex, type Hex } from "viem";
+import {
+  getAddress,
+  isAddress,
+  isHex,
+  keccak256,
+  stringToBytes,
+  type Hex,
+} from "viem";
 
 import {
   decodeDecodedValue,
@@ -30,7 +37,7 @@ const DEFAULT_QUERY_LIMIT = 100;
 const MAXIMUM_QUERY_LIMIT = 1_000;
 
 export class EventQueryService {
-  readonly #catalog: EventCatalog;
+  #catalog: EventCatalog;
   readonly #storage: StorageAdapter;
   readonly #target: ContractTarget;
 
@@ -42,6 +49,14 @@ export class EventQueryService {
     this.#catalog = input.catalog;
     this.#storage = input.storage;
     this.#target = input.target;
+  }
+
+  public get catalog(): EventCatalog {
+    return this.#catalog;
+  }
+
+  public setCatalog(catalog: EventCatalog): void {
+    this.#catalog = catalog;
   }
 
   public async findMany(query: EventQuery = {}): Promise<EventPage> {
@@ -126,8 +141,25 @@ export class EventQueryService {
       );
     }
 
+    const decodeStatus = where.decodeStatus;
+    if (
+      decodeStatus !== undefined &&
+      decodeStatus !== "decoded" &&
+      decodeStatus !== "unknown" &&
+      decodeStatus !== "decode_failed"
+    ) {
+      throw new QueryValidationError(
+        "decodeStatus must be decoded, unknown, or decode_failed",
+      );
+    }
+
     const indexedParameters = this.#normalizeIndexedParameters(
       where.indexedParameters,
+      eventName,
+      eventSignature,
+    );
+    const unindexedParameters = this.#normalizeUnindexedParameters(
+      where.unindexedParameters,
       eventName,
       eventSignature,
     );
@@ -143,9 +175,11 @@ export class EventQueryService {
             }),
           }),
       ...blockFilter,
+      ...(decodeStatus === undefined ? {} : { decodeStatus }),
       ...(eventName === undefined ? {} : { eventName }),
       ...(eventSignature === undefined ? {} : { eventSignature }),
       ...(indexedParameters.length === 0 ? {} : { indexedParameters }),
+      ...(unindexedParameters.length === 0 ? {} : { unindexedParameters }),
       limit,
       order,
       targetKey: this.#target.targetKey,
@@ -194,6 +228,54 @@ export class EventQueryService {
         return Object.freeze({
           comparableValue: encodeDecodedValue(
             normalizeIndexedValue(input.solidityType, value),
+          ),
+          name,
+        });
+      }),
+    );
+  }
+
+  #normalizeUnindexedParameters(
+    parameters: Readonly<Record<string, unknown>> | undefined,
+    eventName: string | undefined,
+    eventSignature: string | undefined,
+  ): readonly StoredIndexedParameterFilter[] {
+    if (parameters === undefined) return [];
+    const entries = Object.entries(parameters);
+    if (entries.length === 0) return [];
+
+    const candidateEvents = resolveCandidateEvents(
+      this.#catalog,
+      eventName,
+      eventSignature,
+    );
+    return Object.freeze(
+      entries.map(([name, value]) => {
+        if (name === "") {
+          throw new QueryValidationError(
+            "Unindexed parameter names must be non-empty",
+          );
+        }
+        const matchingInputs = candidateEvents
+          .flatMap((event) => event.inputs)
+          .filter((input) => !input.indexed && input.name === name);
+        if (matchingInputs.length === 0) {
+          throw new QueryValidationError(
+            `Unindexed parameter ${name} is not present in the selected ABI events`,
+          );
+        }
+        const solidityTypes = new Set(
+          matchingInputs.map((input) => input.solidityType),
+        );
+        if (solidityTypes.size !== 1) {
+          throw new QueryValidationError(
+            `Unindexed parameter ${name} is ambiguous; specify eventSignature`,
+          );
+        }
+        const input = matchingInputs[0] as EventInputDefinition;
+        return Object.freeze({
+          comparableValue: encodeDecodedValue(
+            normalizeUnindexedValue(input.solidityType, value),
           ),
           name,
         });
@@ -361,9 +443,115 @@ function normalizeIndexedValue(solidityType: string, value: unknown): unknown {
     solidityType.includes("[") ||
     solidityType.startsWith("tuple")
   ) {
-    if (typeof value !== "string" || !isHexBytes(value, 32)) {
+    if (isHexBytes(value, 32)) {
+      return value.toLowerCase();
+    }
+    if (solidityType === "string") {
+      if (typeof value === "string") {
+        return keccak256(stringToBytes(value)).toLowerCase();
+      }
       throw new QueryValidationError(
-        "Dynamic indexed values must be supplied as their 32-byte topic hash",
+        "Indexed string value must be a string or 32-byte topic hash",
+      );
+    }
+    if (solidityType === "bytes") {
+      if (typeof value === "string" && isHex(value)) {
+        return keccak256(value).toLowerCase();
+      }
+      if (value instanceof Uint8Array) {
+        return keccak256(value).toLowerCase();
+      }
+      if (typeof value === "string") {
+        return keccak256(stringToBytes(value)).toLowerCase();
+      }
+      throw new QueryValidationError(
+        "Indexed bytes value must be a hex string, Uint8Array, or 32-byte topic hash",
+      );
+    }
+    throw new QueryValidationError(
+      "Dynamic indexed values must be supplied as their 32-byte topic hash",
+    );
+  }
+  if (solidityType.startsWith("bytes")) {
+    const byteLength = Number(solidityType.slice("bytes".length));
+    if (
+      typeof value !== "string" ||
+      !Number.isInteger(byteLength) ||
+      byteLength < 1 ||
+      byteLength > 32 ||
+      !isHexBytes(value, byteLength)
+    ) {
+      throw new QueryValidationError("Indexed bytes value is invalid");
+    }
+    return value.toLowerCase();
+  }
+  return value;
+}
+
+function normalizeUnindexedValue(
+  solidityType: string,
+  value: unknown,
+): unknown {
+  if (solidityType === "address") {
+    if (typeof value !== "string" || !isAddress(value, { strict: false })) {
+      throw new QueryValidationError("Unindexed address value is invalid");
+    }
+    return getAddress(value).toLowerCase();
+  }
+  const integerMatch = /^(u?int)(\d*)$/.exec(solidityType);
+  if (integerMatch !== null) {
+    try {
+      if (typeof value === "number" && !Number.isSafeInteger(value)) {
+        throw new Error("unsafe integer");
+      }
+      if (
+        typeof value !== "bigint" &&
+        typeof value !== "number" &&
+        typeof value !== "string"
+      ) {
+        throw new Error("unsupported integer type");
+      }
+      const normalizedValue = BigInt(value);
+      const bitWidth = integerMatch[2] === "" ? 256 : Number(integerMatch[2]);
+      if (
+        !Number.isInteger(bitWidth) ||
+        bitWidth < 8 ||
+        bitWidth > 256 ||
+        bitWidth % 8 !== 0
+      ) {
+        throw new Error("invalid integer bit width");
+      }
+      const isUnsigned = integerMatch[1] === "uint";
+      const minimum = isUnsigned ? 0n : -(1n << BigInt(bitWidth - 1));
+      const maximum = isUnsigned
+        ? (1n << BigInt(bitWidth)) - 1n
+        : (1n << BigInt(bitWidth - 1)) - 1n;
+      if (normalizedValue < minimum || normalizedValue > maximum) {
+        throw new Error("integer is outside ABI bounds");
+      }
+      return normalizedValue;
+    } catch (cause) {
+      throw new QueryValidationError("Unindexed integer value is invalid", {
+        cause,
+      });
+    }
+  }
+  if (solidityType === "bool") {
+    if (typeof value !== "boolean") {
+      throw new QueryValidationError("Unindexed bool value must be boolean");
+    }
+    return value;
+  }
+  if (solidityType === "string") {
+    if (typeof value !== "string") {
+      throw new QueryValidationError("Unindexed string value must be a string");
+    }
+    return value;
+  }
+  if (solidityType === "bytes") {
+    if (typeof value !== "string" || !isHex(value)) {
+      throw new QueryValidationError(
+        "Unindexed bytes value must be a hex string",
       );
     }
     return value.toLowerCase();
@@ -377,7 +565,7 @@ function normalizeIndexedValue(solidityType: string, value: unknown): unknown {
       byteLength > 32 ||
       !isHexBytes(value, byteLength)
     ) {
-      throw new QueryValidationError("Indexed bytes value is invalid");
+      throw new QueryValidationError("Unindexed bytes value is invalid");
     }
     return value.toLowerCase();
   }

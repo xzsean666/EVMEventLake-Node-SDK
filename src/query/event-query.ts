@@ -10,10 +10,12 @@ export interface BlockNumberRangeFilter {
 
 export interface EventQueryWhere {
   readonly blockNumber?: BlockNumberInput | BlockNumberRangeFilter;
+  readonly decodeStatus?: EventDecodeStatus;
   readonly eventName?: string;
   readonly eventSignature?: string;
   readonly indexedParameters?: Readonly<Record<string, unknown>>;
   readonly transactionHash?: string;
+  readonly unindexedParameters?: Readonly<Record<string, unknown>>;
 }
 
 export interface EventQuery {

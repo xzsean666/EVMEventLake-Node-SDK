@@ -23,12 +23,16 @@ import {
   storageKeyToBlockNumber,
   type CommitRangeRequest,
   type CommitRangeResult,
+  type CountLogsForRedecodeRequest,
+  type GetLogsForRedecodeRequest,
   type RewindResult,
   type StoredEventLog,
   type StoredEventQuery,
   type SyncCheckpoint,
   type TargetRegistration,
   type TargetState,
+  type UpdateDecodedLogsRequest,
+  type UpdateDecodedLogsResult,
 } from "./storage-models.js";
 
 const SCHEMA_VERSION = 1;
@@ -405,6 +409,173 @@ export class SqlStorageAdapter implements StorageAdapter {
     });
   }
 
+  public async countLogsForRedecode(
+    request: CountLogsForRedecodeRequest,
+  ): Promise<number> {
+    let query = this.#database
+      .selectFrom("event_logs")
+      .select((eb) => eb.fn.count("event_id").as("count"))
+      .where("target_key", "=", request.targetKey);
+
+    if (request.redecodeAll !== true) {
+      query = query.where("decode_status", "in", ["unknown", "decode_failed"]);
+    }
+    if (request.fromBlock !== undefined) {
+      query = query.where(
+        "block_number_key",
+        ">=",
+        blockNumberToStorageKey(request.fromBlock),
+      );
+    }
+    if (request.toBlock !== undefined) {
+      query = query.where(
+        "block_number_key",
+        "<=",
+        blockNumberToStorageKey(request.toBlock),
+      );
+    }
+
+    const result = await query.executeTakeFirst();
+    return Number(result?.count ?? 0);
+  }
+
+  public async getLogsForRedecode(
+    request: GetLogsForRedecodeRequest,
+  ): Promise<readonly StoredEventLog[]> {
+    let query = this.#database
+      .selectFrom("event_logs")
+      .selectAll()
+      .where("target_key", "=", request.targetKey);
+
+    if (request.redecodeAll !== true) {
+      query = query.where("decode_status", "in", ["unknown", "decode_failed"]);
+    }
+    if (request.fromBlock !== undefined) {
+      query = query.where(
+        "block_number_key",
+        ">=",
+        blockNumberToStorageKey(request.fromBlock),
+      );
+    }
+    if (request.toBlock !== undefined) {
+      query = query.where(
+        "block_number_key",
+        "<=",
+        blockNumberToStorageKey(request.toBlock),
+      );
+    }
+    if (request.after !== undefined) {
+      const afterBlockKey = blockNumberToStorageKey(request.after.blockNumber);
+      const afterLogIndex = request.after.logIndex;
+      query = query.where((eb) =>
+        eb.or([
+          eb("block_number_key", ">", afterBlockKey),
+          eb.and([
+            eb("block_number_key", "=", afterBlockKey),
+            eb("log_index", ">", afterLogIndex),
+          ]),
+        ]),
+      );
+    }
+
+    query = query
+      .orderBy("block_number_key", "asc")
+      .orderBy("log_index", "asc")
+      .limit(request.limit);
+
+    const rows = await query.execute();
+    if (rows.length === 0) return Object.freeze([]);
+
+    const parameterRows = await this.#database
+      .selectFrom("event_parameters")
+      .selectAll()
+      .where(
+        "event_id",
+        "in",
+        rows.map((row) => row.event_id),
+      )
+      .execute();
+    const parameterRowsByEventId = new Map<
+      string,
+      StorageDatabaseSchema["event_parameters"][]
+    >();
+    for (const parameterRow of parameterRows) {
+      const existing = parameterRowsByEventId.get(parameterRow.event_id);
+      if (existing === undefined) {
+        parameterRowsByEventId.set(parameterRow.event_id, [parameterRow]);
+      } else {
+        existing.push(parameterRow);
+      }
+    }
+
+    return Object.freeze(
+      rows.map((row) =>
+        rowToStoredEventLog(
+          row,
+          parameterRowsByEventId.get(row.event_id) ?? [],
+        ),
+      ),
+    );
+  }
+
+  public async updateDecodedLogs(
+    request: UpdateDecodedLogsRequest,
+  ): Promise<UpdateDecodedLogsResult> {
+    if (request.logs.length === 0) {
+      return Object.freeze({ updatedLogs: 0 });
+    }
+
+    await this.#database.transaction().execute(async (transaction) => {
+      const eventIds = request.logs.map((log) => log.eventId);
+
+      // 1. Delete old parameters for these events
+      await transaction
+        .deleteFrom("event_parameters")
+        .where("target_key", "=", request.targetKey)
+        .where("event_id", "in", eventIds)
+        .execute();
+
+      // 2. Update each event log row
+      for (const log of request.logs) {
+        await transaction
+          .updateTable("event_logs")
+          .set({
+            abi_fingerprint: log.abiFingerprint,
+            decode_status: log.decodeStatus,
+            decoded_arguments: log.decodedArguments,
+            event_name: log.eventName,
+            event_signature: log.eventSignature,
+          })
+          .where("target_key", "=", request.targetKey)
+          .where("event_id", "=", log.eventId)
+          .execute();
+      }
+
+      // 3. Insert new parameters for decoded logs
+      const parameterRows = request.logs.flatMap((log) =>
+        log.parameters.map((parameter) => ({
+          comparable_value: parameter.comparableValue,
+          event_id: log.eventId,
+          is_indexed: parameter.indexed ? 1 : 0,
+          name: parameter.name,
+          position: parameter.position,
+          raw_topic: parameter.rawTopicValue,
+          solidity_type: parameter.solidityType,
+          target_key: log.targetKey,
+        })),
+      );
+
+      if (parameterRows.length > 0) {
+        await transaction
+          .insertInto("event_parameters")
+          .values(parameterRows)
+          .execute();
+      }
+    });
+
+    return Object.freeze({ updatedLogs: request.logs.length });
+  }
+
   public async queryEvents(
     input: StoredEventQuery,
   ): Promise<readonly StoredEventLog[]> {
@@ -446,6 +617,9 @@ export class SqlStorageAdapter implements StorageAdapter {
     if (input.eventSignature !== undefined) {
       query = query.where("event_signature", "=", input.eventSignature);
     }
+    if (input.decodeStatus !== undefined) {
+      query = query.where("decode_status", "=", input.decodeStatus);
+    }
     for (const parameter of input.indexedParameters ?? []) {
       query = query.where(
         "event_id",
@@ -455,6 +629,19 @@ export class SqlStorageAdapter implements StorageAdapter {
           .select("event_id")
           .where("target_key", "=", input.targetKey)
           .where("is_indexed", "=", 1)
+          .where("name", "=", parameter.name)
+          .where("comparable_value", "=", parameter.comparableValue),
+      );
+    }
+    for (const parameter of input.unindexedParameters ?? []) {
+      query = query.where(
+        "event_id",
+        "in",
+        this.#database
+          .selectFrom("event_parameters")
+          .select("event_id")
+          .where("target_key", "=", input.targetKey)
+          .where("is_indexed", "=", 0)
           .where("name", "=", parameter.name)
           .where("comparable_value", "=", parameter.comparableValue),
       );

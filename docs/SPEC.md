@@ -48,8 +48,7 @@ V1 must not include:
 - Automatic “recent N blocks” business queries.
 - Multi-contract orchestration in one SDK instance.
 - Arbitrary user SQL in the public API.
-- ABI discovery from explorers.
-- Historical re-decoding after an ABI change.
+- Automatic ABI discovery from explorers.
 - npm registry publication.
 
 ## 4. Terminology
@@ -212,7 +211,7 @@ The initial API provides:
 
 | Option | Accepted value | Rules |
 | --- | --- | --- |
-| `database` | String | Supported SQLite or PostgreSQL URL |
+| `database` | String | Supported SQLite, PostgreSQL, or IndexedDB URL |
 | `rpcUrls` | Non-empty string array | HTTP or HTTPS only; duplicates removed without reordering |
 | `chainId` | Positive integer | Normalized to an integer and checked against RPC responses |
 | `contractAddress` | EVM address | Valid 20-byte address; canonical identity is lowercase |
@@ -225,14 +224,21 @@ Required URL forms:
 
 | Database | Example | Meaning |
 | --- | --- | --- |
-| SQLite relative file | `sqlite://events.db` | File resolved from the caller process working directory |
-| SQLite absolute file | `sqlite:///var/lib/app/events.db` | Absolute file path |
+| SQLite relative file | `sqlite://events.db`, `sqlite:events.db`, `./events.db` | File resolved from the caller process working directory |
+| SQLite absolute POSIX | `sqlite:///var/lib/app/events.db`, `sqlite:/var/lib/app/events.db` | Absolute POSIX file path |
+| SQLite Windows drive | `sqlite:///C:/data/events.db`, `sqlite:C:\data\events.db` | Windows absolute path with drive letter |
+| SQLite in-memory | `:memory:`, `sqlite::memory:`, `sqlite://:memory:` | Ephemeral in-memory SQLite database |
+| SQLite file alias | `file:///var/lib/app/events.db`, `file://events.db` | Standard `file://` URI mapped to SQLite |
 | PostgreSQL | `postgresql://user:password@host:5432/database` | Standard PostgreSQL connection URL |
 | PostgreSQL alias | `postgres://user:password@host:5432/database` | Accepted alias |
+| IndexedDB | `idb://lake-events` | Browser IndexedDB database named `lake-events` |
+| IndexedDB alias | `indexeddb://lake-events` | Accepted alias for browser IndexedDB |
 
-SQLite initialization may create the database file. The parent directory must
-already exist. Database URLs containing credentials must be redacted in logs and
-errors.
+SQLite initialization may create the database file when pointing to a persistent path. The parent directory must
+already exist (except for `:memory:` in-memory mode). Database URLs containing credentials must be redacted in logs and
+errors. In browser dApps and bundling environments, `idb://` requires zero Node.js
+C++ native bindings (`better-sqlite3`, `pg`), loading storage drivers via dynamic
+asynchronous imports.
 
 ### 7.3 Optional synchronization policy
 
@@ -254,6 +260,7 @@ chain and risk tolerance.
 
 | Field | V1 default | Rules |
 | --- | --- | --- |
+| `batchSize` | `1` | Positive integer; maximum contiguous sub-ranges per JSON-RPC batch payload (`1` for single-request compatibility) |
 | `requestTimeoutMs` | `20000` | Positive bounded timeout per RPC attempt |
 | `maxRetriesPerEndpoint` | `2` | Non-negative bounded retry count |
 | `endpointCooldownMs` | `30000` | Positive cooldown after endpoint failure |
@@ -378,6 +385,17 @@ Errors and observability events may include endpoint origin and a redacted path,
 but must remove user information, passwords, sensitive query values, and API
 keys.
 
+### 9.5 JSON-RPC Batch Requesting and Adaptive Fallback
+
+When `rpc.batchSize > 1` is configured:
+
+- Contiguous synchronization ranges are grouped into JSON-RPC 2.0 batch payloads (`[{ id, jsonrpc: "2.0", method: "eth_getLogs", params }, ...]`).
+- Responses are matched back to requests by `id` regardless of response arrival order.
+- Individual item errors within a batch response are parsed and classified (e.g. `range_limit`).
+- If an endpoint explicitly rejects batching (HTTP 405, 501, or error messages containing "batch"), the pool marks `endpoint.batchSupported = false` and automatically falls back to single-request execution on that endpoint without triggering false failovers or cooling down healthy endpoints.
+- If a batch fails partially or with `range_limit`, the synchronization engine decomposes the batch into individual single-range fetches, allowing standard adaptive range splitting (`splitSynchronizationRange`) to isolate dense block intervals without losing events.
+- Storage commits remain strictly contiguous, leaf-by-leaf, and atomic in all paths.
+
 ## 10. ABI and Decoding Requirements
 
 ### 10.1 Event catalog
@@ -426,6 +444,16 @@ Database representation must not lose integer precision or byte content.
 
 Public results may rehydrate integers to JavaScript `bigint`. The chosen output
 contract must be stable and documented before implementation completes.
+
+### 10.5 Historical Re-decoding
+
+When upgradeable proxy contracts upgrade their implementation ABI or expand their event catalog, callers can re-evaluate previously stored logs using `client.redecode({ abi, fromBlock?, toBlock?, redecodeAll?, batchSize?, onProgress?, signal? })`:
+
+- Registers the new ABI version into `abi_versions` and updates the active target ABI fingerprint without overwriting historical version history.
+- Iterates over existing event logs using deterministic cursor pagination. By default (`redecodeAll: false`), only previously `unknown` or `decode_failed` logs are re-decoded; when `redecodeAll: true`, all logs within the block range are re-evaluated.
+- Atomically replaces decoded fields in `event_logs` and synchronizes indexed lookup rows in `event_parameters` in batched transactions.
+- Merges the newly registered event definitions into the query catalog so that events from all known contract versions can be queried.
+- Mutual exclusion guarantees `redecode()` and `update()` cannot execute concurrently on the same SDK instance.
 
 ## 11. Storage Requirements
 
@@ -506,20 +534,33 @@ V1 supports AND composition of:
 - Transaction hash.
 - Event name.
 - Full event signature.
-- Exact indexed parameter values.
+- Exact indexed parameter values (`where.indexedParameters`).
+- Exact unindexed parameter values (`where.unindexedParameters`).
+- Decode status (`decoded`, `unknown`, `decode_failed`).
 
 OR groups, free-form expressions, numeric parameter ranges, and arbitrary SQL
 are future features.
 
-### 13.2 Indexed parameters
+### 13.2 Indexed and Dynamic Parameters
 
 - Indexed parameter filtering is exact-match in V1.
 - Values are normalized according to the event ABI type.
-- Dynamic indexed values represented by topic hashes are queried by hash.
-- If an event name is overloaded and the parameter cannot be resolved
-  unambiguously, the query must require an event signature.
+- Dynamic indexed values (Solidity `string`, `bytes`):
+  - Callers may query dynamic indexed parameters with plaintext strings (e.g. `indexedParameters: { username: "Alice" }`) or hex/Uint8Array bytes; the SDK automatically computes the Keccak-256 topic hash client-side.
+  - Direct 32-byte Keccak-256 topic hash queries remain fully supported for backward compatibility.
+  - Complex dynamic types (arrays, tuples) require supplying the 32-byte topic hash directly.
+- If an event name is overloaded and the parameter cannot be resolved unambiguously, the query requires `eventSignature`.
 
-### 13.3 Ordering
+### 13.3 Unindexed Parameters and Performance Optimization
+
+- Callers may filter by decoded non-indexed parameters via `where.unindexedParameters`.
+- Values are type-checked and normalized according to the ABI input type (`address`, `uint`/`int` bounds, `bool`, `string`, `bytes`).
+- Stored parameter lookups are fully accelerated across all storage engines:
+  - SQLite & PostgreSQL: Query `event_parameters` via the compound index `event_parameters_lookup (target_key, name, comparable_value, is_indexed)` with `is_indexed = 0`.
+  - IndexedDB: Query `event_parameters` object store via the compound index `by_lookup (targetKey, name, comparableValue, indexed)` with `indexed = 0`.
+- 100% contract and behavioral parity is maintained across SQLite, PostgreSQL, and IndexedDB.
+
+### 13.4 Ordering
 
 Canonical ascending chain order is:
 
@@ -530,7 +571,7 @@ Canonical ascending chain order is:
 Descending order reverses the complete tuple. Results must not depend on SQL
 engine default ordering.
 
-### 13.4 Pagination
+### 13.5 Pagination
 
 - Default limit: `100`.
 - Maximum limit: `1000`.
@@ -539,7 +580,7 @@ engine default ordering.
 - Invalid or mismatched cursors return a typed validation error.
 - Offset pagination is not part of V1.
 
-### 13.5 Event result
+### 13.6 Event result
 
 Each result includes:
 

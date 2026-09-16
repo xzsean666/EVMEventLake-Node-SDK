@@ -2,12 +2,15 @@ import type { Address } from "viem";
 
 import {
   NoValidRpcEndpointError,
+  OperationCancelledError,
   RpcRequestExhaustedError,
   UnfetchableBlockError,
 } from "../errors/evm-event-lake-errors.js";
 import type {
   FetchLogsOptions,
+  LogRangeQuery,
   RpcLog,
+  RpcLogsBatchResult,
   RpcLogsResult,
 } from "../rpc/rpc-pool.js";
 import { RpcRequestFailure } from "../rpc/rpc-error-classifier.js";
@@ -24,6 +27,11 @@ export interface AdaptiveLogRpcClient {
     toBlock: bigint,
     options?: FetchLogsOptions,
   ): Promise<RpcLogsResult>;
+  fetchLogsBatch?(
+    contractAddress: Address,
+    ranges: readonly LogRangeQuery[],
+    options?: FetchLogsOptions,
+  ): Promise<RpcLogsBatchResult>;
 }
 
 export interface FetchedLogRange {
@@ -84,6 +92,62 @@ export class AdaptiveLogFetcher {
   }
 
   public async *fetch(
+    range: SynchronizationRange,
+    signal?: AbortSignal,
+  ): AsyncGenerator<FetchedLogRange> {
+    yield* this.fetchRanges([range], signal);
+  }
+
+  public async *fetchRanges(
+    ranges: readonly SynchronizationRange[],
+    signal?: AbortSignal,
+  ): AsyncGenerator<FetchedLogRange> {
+    if (ranges.length === 0) return;
+    if (ranges.length === 1 || this.#rpc.fetchLogsBatch === undefined) {
+      for (const range of ranges) {
+        yield* this.#fetchSingleRange(range, signal);
+      }
+      return;
+    }
+
+    try {
+      await this.#beforeRequest?.();
+      for (const range of ranges) {
+        this.#onRangeFetchStarted?.(range);
+      }
+      const batchResult = await this.#rpc.fetchLogsBatch(
+        this.#contractAddress,
+        ranges,
+        {
+          ...(signal === undefined ? {} : { signal }),
+        },
+      );
+      for (const item of batchResult.items) {
+        const matchingRange = ranges.find(
+          (candidate) =>
+            candidate.fromBlock === item.fromBlock &&
+            candidate.toBlock === item.toBlock,
+        );
+        yield Object.freeze({
+          endpointIdentity: batchResult.endpointIdentity,
+          endpointUrl: batchResult.endpointUrl,
+          logs: item.logs,
+          range: matchingRange ?? {
+            fromBlock: item.fromBlock,
+            toBlock: item.toBlock,
+          },
+        });
+      }
+      return;
+    } catch (error) {
+      if (error instanceof OperationCancelledError) throw error;
+      for (const range of ranges) {
+        yield* this.#fetchSingleRange(range, signal);
+      }
+    }
+  }
+
+  async *#fetchSingleRange(
     range: SynchronizationRange,
     signal?: AbortSignal,
   ): AsyncGenerator<FetchedLogRange> {

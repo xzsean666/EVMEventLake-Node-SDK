@@ -2,6 +2,7 @@
   "name": "@evm-event-lake/node-sdk",
   "version": "0.1.0",
   "description": "One-shot EVM contract event log synchronization and database query SDK",
+  "license": "MIT",
   "private": true,
   "repository": {
     "type": "git",
@@ -48,6 +49,7 @@
     "test:storage:sqlite": "vitest run tests/storage-contract/sqlite-storage-adapter.test.ts",
     "test:storage:postgresql": "vitest run tests/storage-contract/postgresql-storage-adapter.test.ts",
     "test:storage:postgresql:real": "vitest run tests/real-postgresql/postgresql-real.test.ts",
+    "test:storage:indexeddb": "vitest run tests/storage-contract/indexeddb-storage-adapter.test.ts tests/storage-contract/indexeddb-query-adapter.test.ts",
     "test:integration": "vitest run tests/integration",
     "test:live-rpc": "vitest run tests/live-rpc",
     "test:git-install": "node scripts/test-git-install.mjs",
@@ -62,6 +64,7 @@
   },
   "dependencies": {
     "better-sqlite3": "12.11.1",
+    "evm-call": "github:xzsean666/evm-call#d7a5c16d2bcbda6255d05f1f5b745eac88f699c0",
     "kysely": "0.29.3",
     "pg": "8.22.0",
     "viem": "2.55.2"
@@ -72,6 +75,7 @@
     "@types/node": "24.13.3",
     "@types/pg": "8.20.0",
     "eslint": "9.39.5",
+    "fake-indexeddb": "^6.2.5",
     "globals": "17.7.0",
     "pg-mem": "3.0.14",
     "prettier": "3.9.5",

@@ -40,7 +40,10 @@ import {
   type AdaptiveLogRpcClient,
 } from "./adaptive-log-fetcher.js";
 import { ensureChainConsistency } from "./chain-consistency-checker.js";
-import { iterateSynchronizationRanges } from "./synchronization-range-planner.js";
+import {
+  iterateSynchronizationRanges,
+  type SynchronizationRange,
+} from "./synchronization-range-planner.js";
 import type {
   UpdateOptions,
   UpdateResult,
@@ -276,14 +279,13 @@ export class UpdateService {
       let unknownLogs = 0;
       const reportedEndpointIdentities = new Set<string>();
 
-      for (const preferredRange of iterateSynchronizationRanges(
-        fromBlock,
-        resolvedToBlock,
-        blockRange,
+      for (const batch of chunkRanges(
+        iterateSynchronizationRanges(fromBlock, resolvedToBlock, blockRange),
+        this.#rpcPolicy.batchSize,
       )) {
-        preferredRanges += 1;
-        for await (const fetchedRange of adaptiveFetcher.fetch(
-          preferredRange,
+        preferredRanges += batch.length;
+        for await (const fetchedRange of adaptiveFetcher.fetchRanges(
+          batch,
           options.signal,
         )) {
           if (!reportedEndpointIdentities.has(fetchedRange.endpointIdentity)) {
@@ -684,4 +686,22 @@ function validateEndBlockLogs(
 function compareBigInt(left: bigint, right: bigint): number {
   if (left === right) return 0;
   return left < right ? -1 : 1;
+}
+
+function* chunkRanges(
+  ranges: Iterable<SynchronizationRange>,
+  chunkSize: number,
+): Generator<readonly SynchronizationRange[]> {
+  const size = Math.max(1, chunkSize);
+  let chunk: SynchronizationRange[] = [];
+  for (const range of ranges) {
+    chunk.push(range);
+    if (chunk.length >= size) {
+      yield Object.freeze(chunk);
+      chunk = [];
+    }
+  }
+  if (chunk.length > 0) {
+    yield Object.freeze(chunk);
+  }
 }

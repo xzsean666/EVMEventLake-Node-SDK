@@ -26,6 +26,11 @@ export type {
   EventRecord,
 } from "./query/event-query.js";
 export type {
+  RedecodeOptions,
+  RedecodeProgress,
+  RedecodeResult,
+} from "./synchronization/redecode-service.js";
+export type {
   UpdateOptions,
   UpdateResult,
   UpdateRewindResult,

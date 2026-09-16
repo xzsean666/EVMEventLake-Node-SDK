@@ -59,6 +59,41 @@ describe("validateSdkOptions", () => {
     ).toBe("postgresql://localhost:5432/redacted");
   });
 
+  it("supports idb:// and indexeddb:// schemes with valid database names", () => {
+    const idbConfig = parseDatabaseConfiguration("idb://my-dapp-db");
+    expect(idbConfig).toEqual({
+      databaseName: "my-dapp-db",
+      kind: "indexeddb",
+    });
+    expect(Object.isFrozen(idbConfig)).toBe(true);
+
+    const fullIndexedDbConfig = parseDatabaseConfiguration(
+      "indexeddb://uniswap_v3_pool",
+    );
+    expect(fullIndexedDbConfig).toEqual({
+      databaseName: "uniswap_v3_pool",
+      kind: "indexeddb",
+    });
+  });
+
+  it("rejects malformed idb:// and indexeddb:// URLs", () => {
+    expect(() => parseDatabaseConfiguration("idb://")).toThrow(
+      UnsupportedDatabaseUrlError,
+    );
+    expect(() => parseDatabaseConfiguration("idb://my-db?foo=bar")).toThrow(
+      UnsupportedDatabaseUrlError,
+    );
+    expect(() => parseDatabaseConfiguration("idb://my-db#frag")).toThrow(
+      UnsupportedDatabaseUrlError,
+    );
+    expect(() => parseDatabaseConfiguration("idb://nested/path")).toThrow(
+      UnsupportedDatabaseUrlError,
+    );
+    expect(() =>
+      parseDatabaseConfiguration("indexeddb://has\\backslash"),
+    ).toThrow(UnsupportedDatabaseUrlError);
+  });
+
   it("rejects unsupported database schemes", () => {
     expect(() =>
       parseDatabaseConfiguration("mysql://localhost/events"),

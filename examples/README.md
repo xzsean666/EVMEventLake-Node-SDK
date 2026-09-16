@@ -12,6 +12,7 @@
 | [`04-postgresql-storage.ts`](./04-postgresql-storage.ts)                 | **PostgreSQL 生产存储与多进程** | PostgreSQL 连接串配置、自动迁移（Schema Migrations）、分布式租约（Lease）并发互斥、无 RPC 依赖的 Web/API 只读查询服务        | `pnpm run example:postgres`      |
 | [`05-observability-and-progress.ts`](./05-observability-and-progress.ts) | **监控与生命周期阶段追踪**      | 自定义结构化 `SdkLogger`、`onProgress` 阶段回调（节点校验、自适应拆分、落库原子提交、重组回滚）、`UpdateResult` 详尽统计     | `pnpm run example:observability` |
 | [`06-erc721-nft-tracker.ts`](./06-erc721-nft-tracker.ts)                 | **NFT (ERC-721) 追踪**          | ERC-721 Indexed TokenId 特性、零地址判定 NFT 铸造（Mint）、单 Token 历史流转追溯、按买家地址聚合                             | `pnpm run example:nft`           |
+| [`07-browser-indexeddb/`](./07-browser-indexeddb/)                       | **浏览器前端与 dApp 集成**      | 纯前端 `idb://` 模式、零 Node 原生依赖绑定、浏览器 IndexedDB 持久化缓存、离线事件检索、Vite 构建集成                         | 详见目录内说明                   |
 
 ---
 

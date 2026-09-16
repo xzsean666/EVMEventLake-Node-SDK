@@ -176,6 +176,35 @@ export function runStorageAdapterContract(
       expect(events).toHaveLength(1);
       expect(events[0]?.eventId).toBe(log.eventId);
       expect(events[0]?.parameters).toEqual(log.parameters);
+
+      const eventsWithUnindexed = await adapter.queryEvents({
+        eventName: "ValueChanged",
+        limit: 10,
+        order: "ascending",
+        targetKey: target.targetKey,
+        unindexedParameters: [
+          {
+            comparableValue: encodeDecodedValue(10n),
+            name: "value",
+          },
+        ],
+      });
+      expect(eventsWithUnindexed).toHaveLength(1);
+      expect(eventsWithUnindexed[0]?.eventId).toBe(log.eventId);
+
+      const noMatchUnindexed = await adapter.queryEvents({
+        eventName: "ValueChanged",
+        limit: 10,
+        order: "ascending",
+        targetKey: target.targetKey,
+        unindexedParameters: [
+          {
+            comparableValue: encodeDecodedValue(999n),
+            name: "value",
+          },
+        ],
+      });
+      expect(noMatchUnindexed).toHaveLength(0);
     });
 
     it("rejects a commit that does not start at the durable cursor", async () => {
@@ -266,6 +295,134 @@ export function runStorageAdapterContract(
         await adapter.getRecentCheckpoints(target.targetKey, 10),
       ).toHaveLength(1);
     });
+
+    it("counts, pages, and updates undecoded logs for historical redecoding", async () => {
+      const decodedLog = createStoredLog({ blockNumber: 100n, logIndex: 0 });
+      const unknownLog = createUnknownStoredLog({
+        blockNumber: 100n,
+        logIndex: 1,
+      });
+
+      await adapter.commitRange({
+        abiFingerprint: catalog.abiFingerprint,
+        endBlockHash: decodedLog.blockHash,
+        fromBlock: 100n,
+        logs: [decodedLog, unknownLog],
+        targetKey: target.targetKey,
+        toBlock: 100n,
+      });
+
+      // Count candidate logs
+      const unknownCount = await adapter.countLogsForRedecode({
+        targetKey: target.targetKey,
+      });
+      expect(unknownCount).toBe(1);
+
+      const allCount = await adapter.countLogsForRedecode({
+        redecodeAll: true,
+        targetKey: target.targetKey,
+      });
+      expect(allCount).toBe(2);
+
+      // Page candidate logs
+      const paged = await adapter.getLogsForRedecode({
+        limit: 10,
+        targetKey: target.targetKey,
+      });
+      expect(paged).toHaveLength(1);
+      expect(paged[0]?.eventId).toBe(unknownLog.eventId);
+
+      // Update decoded log
+      const updatedLog: StoredEventLog = {
+        ...unknownLog,
+        abiFingerprint: "sha256:new-abi",
+        decodeStatus: "decoded",
+        decodedArguments: encodeDecodedValue({
+          implementation: "0x0000000000000000000000000000000000000099",
+        }),
+        eventName: "Upgraded",
+        eventSignature: "Upgraded(address)",
+        parameters: [
+          {
+            comparableValue: encodeDecodedValue(
+              "0x0000000000000000000000000000000000000099",
+            ),
+            indexed: true,
+            name: "implementation",
+            position: 0,
+            rawTopicValue: hex32("99"),
+            solidityType: "address",
+            value: "0x0000000000000000000000000000000000000099",
+          },
+        ],
+      };
+
+      const updateResult = await adapter.updateDecodedLogs({
+        logs: [updatedLog],
+        targetKey: target.targetKey,
+      });
+      expect(updateResult.updatedLogs).toBe(1);
+
+      // Verify no remaining unknown logs
+      expect(
+        await adapter.countLogsForRedecode({ targetKey: target.targetKey }),
+      ).toBe(0);
+
+      // Query by event name and indexed parameter
+      const queried = await adapter.queryEvents({
+        eventName: "Upgraded",
+        indexedParameters: [
+          {
+            comparableValue: encodeDecodedValue(
+              "0x0000000000000000000000000000000000000099",
+            ),
+            name: "implementation",
+          },
+        ],
+        limit: 10,
+        order: "ascending",
+        targetKey: target.targetKey,
+      });
+      expect(queried).toHaveLength(1);
+      expect(queried[0]?.eventName).toBe("Upgraded");
+      expect(queried[0]?.decodeStatus).toBe("decoded");
+    });
+  });
+}
+
+function createUnknownStoredLog(input: {
+  readonly blockNumber: bigint;
+  readonly logIndex: number;
+}): StoredEventLog {
+  const blockHash = hex32(
+    (input.blockNumber % 255n).toString(16).padStart(2, "0"),
+  );
+  const transactionHash = hex32(
+    ((input.blockNumber + 1n) % 255n).toString(16).padStart(2, "0"),
+  );
+  return Object.freeze({
+    abiFingerprint: catalog.abiFingerprint,
+    blockHash,
+    blockNumber: input.blockNumber,
+    contractAddress,
+    data: "0x",
+    decodedArguments: null,
+    decodeStatus: "unknown",
+    eventId: createStoredEventId({
+      blockHash,
+      logIndex: input.logIndex,
+      targetKey: target.targetKey,
+      transactionHash,
+    }),
+    eventName: null,
+    eventSignature: null,
+    logIndex: input.logIndex,
+    parameters: [],
+    removed: false,
+    targetKey: target.targetKey,
+    topics: [hex32("ff")],
+    transactionHash,
+    transactionIndex: 0,
   });
 }
 
