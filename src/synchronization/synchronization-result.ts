@@ -35,6 +35,7 @@ export interface UpdateResult {
   readonly outcome: "no_op" | "synchronized";
   readonly preferredRanges: number;
   readonly previousNextBlock: bigint;
+  readonly prunedLogs?: number | undefined;
   readonly rangeSplits: number;
   readonly resultingNextBlock: bigint;
   readonly rewind: UpdateRewindResult | null;

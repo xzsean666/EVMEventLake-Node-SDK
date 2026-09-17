@@ -388,6 +388,62 @@ export function runStorageAdapterContract(
       expect(queried[0]?.eventName).toBe("Upgraded");
       expect(queried[0]?.decodeStatus).toBe("decoded");
     });
+
+    it("prunes events older than beforeBlockNumber and enforces maxEventsToKeep", async () => {
+      if (adapter.pruneEvents === undefined) return;
+
+      for (const blockNumber of [100n, 101n, 102n]) {
+        const log = createStoredLog({ blockNumber, logIndex: 0 });
+        await adapter.commitRange({
+          abiFingerprint: catalog.abiFingerprint,
+          endBlockHash: log.blockHash,
+          fromBlock: blockNumber,
+          logs: [log],
+          targetKey: target.targetKey,
+          toBlock: blockNumber,
+        });
+      }
+
+      let logs = await adapter.queryEvents({
+        limit: 10,
+        order: "descending",
+        targetKey: target.targetKey,
+      });
+      expect(logs).toHaveLength(3);
+
+      const pruneResult1 = await adapter.pruneEvents({
+        beforeBlockNumber: 101n,
+        targetKey: target.targetKey,
+      });
+      expect(pruneResult1.prunedLogs).toBe(1);
+
+      logs = await adapter.queryEvents({
+        limit: 10,
+        order: "descending",
+        targetKey: target.targetKey,
+      });
+      expect(logs).toHaveLength(2);
+      expect(logs.map((l) => l.blockNumber)).toEqual([102n, 101n]);
+
+      const pruneResult2 = await adapter.pruneEvents({
+        maxEventsToKeep: 1,
+        targetKey: target.targetKey,
+      });
+      expect(pruneResult2.prunedLogs).toBe(1);
+
+      logs = await adapter.queryEvents({
+        limit: 10,
+        order: "descending",
+        targetKey: target.targetKey,
+      });
+      expect(logs).toHaveLength(1);
+      expect(logs[0]?.blockNumber).toBe(102n);
+
+      const pruneResult3 = await adapter.pruneEvents({
+        targetKey: target.targetKey,
+      });
+      expect(pruneResult3.prunedLogs).toBe(0);
+    });
   });
 }
 

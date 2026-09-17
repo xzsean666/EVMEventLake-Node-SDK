@@ -1,5 +1,8 @@
 import { EventCatalog } from "../abi/event-catalog.js";
-import type { EVMEventLakeOptions } from "../configuration/sdk-options.js";
+import type {
+  DataRetentionOptions,
+  EVMEventLakeOptions,
+} from "../configuration/sdk-options.js";
 import { validateSdkOptions } from "../configuration/validate-sdk-options.js";
 import { createContractTarget } from "../contract-target/contract-target.js";
 import {
@@ -17,6 +20,7 @@ import type {
 import { RpcPool } from "../rpc/rpc-pool.js";
 import { createStorageAdapter } from "../storage/create-storage-adapter.js";
 import type { StorageAdapter } from "../storage/storage-adapter.js";
+import type { PruneEventsResult } from "../storage/storage-models.js";
 import {
   RedecodeService,
   type RedecodeOptions,
@@ -35,6 +39,7 @@ export class EVMEventLake {
   readonly #lifecycleAbortController = new AbortController();
   readonly #queryService: EventQueryService;
   readonly #redecodeService: RedecodeService;
+  readonly #retention: DataRetentionOptions;
   readonly #storage: StorageAdapter;
   readonly #targetKey: string;
   readonly #updateService: UpdateService;
@@ -45,12 +50,14 @@ export class EVMEventLake {
   private constructor(input: {
     readonly queryService: EventQueryService;
     readonly redecodeService: RedecodeService;
+    readonly retention: DataRetentionOptions;
     readonly storage: StorageAdapter;
     readonly targetKey: string;
     readonly updateService: UpdateService;
   }) {
     this.#queryService = input.queryService;
     this.#redecodeService = input.redecodeService;
+    this.#retention = input.retention;
     this.#storage = input.storage;
     this.#targetKey = input.targetKey;
     this.#updateService = input.updateService;
@@ -126,6 +133,7 @@ export class EVMEventLake {
       return new EVMEventLake({
         queryService,
         redecodeService,
+        retention: normalized.retention,
         storage,
         targetKey: target.targetKey,
         updateService,
@@ -154,10 +162,60 @@ export class EVMEventLake {
     const updatePromise = this.#updateService.update({ ...options, signal });
     this.#activeOperation = updatePromise;
     try {
-      return await updatePromise;
+      const updateResult = await updatePromise;
+      if (
+        this.#retention.enabled === true &&
+        this.#retention.pruneOnUpdate !== false
+      ) {
+        const pruneResult = await this.#executePrune(this.#retention);
+        return Object.freeze({
+          ...updateResult,
+          prunedLogs: pruneResult.prunedLogs,
+        });
+      }
+      return updateResult;
     } finally {
       if (this.#activeOperation === updatePromise) this.#activeOperation = null;
     }
+  }
+
+  public async prune(
+    options?: DataRetentionOptions,
+  ): Promise<PruneEventsResult> {
+    this.#assertOpen();
+    return this.#executePrune(options ?? this.#retention);
+  }
+
+  async #executePrune(
+    retention: DataRetentionOptions,
+  ): Promise<PruneEventsResult> {
+    if (this.#storage.pruneEvents === undefined) {
+      return Object.freeze({ prunedLogs: 0 });
+    }
+
+    const maxBlocks = retention.maxBlocks;
+    const maxEvents = retention.maxEvents;
+
+    if (maxBlocks === undefined && maxEvents === undefined) {
+      return Object.freeze({ prunedLogs: 0 });
+    }
+
+    let beforeBlockNumber: bigint | undefined;
+    if (maxBlocks !== undefined) {
+      const state = await this.#storage.getTargetState(this.#targetKey);
+      if (state !== null && state.nextBlock > 0n) {
+        const maxBlocksBigInt = BigInt(maxBlocks);
+        if (state.nextBlock > maxBlocksBigInt) {
+          beforeBlockNumber = state.nextBlock - maxBlocksBigInt;
+        }
+      }
+    }
+
+    return await this.#storage.pruneEvents({
+      ...(beforeBlockNumber !== undefined ? { beforeBlockNumber } : {}),
+      ...(maxEvents !== undefined ? { maxEventsToKeep: maxEvents } : {}),
+      targetKey: this.#targetKey,
+    });
   }
 
   public async redecode(options: RedecodeOptions): Promise<RedecodeResult> {

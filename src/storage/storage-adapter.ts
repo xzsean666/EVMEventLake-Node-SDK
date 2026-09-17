@@ -3,6 +3,8 @@ import type {
   CommitRangeResult,
   CountLogsForRedecodeRequest,
   GetLogsForRedecodeRequest,
+  PruneEventsRequest,
+  PruneEventsResult,
   RewindResult,
   StoredEventLog,
   StoredEventQuery,
@@ -41,6 +43,7 @@ export interface StorageAdapter {
   getTargetState(targetKey: string): Promise<TargetState | null>;
   initialize(): Promise<void>;
   queryEvents(query: StoredEventQuery): Promise<readonly StoredEventLog[]>;
+  pruneEvents?(request: PruneEventsRequest): Promise<PruneEventsResult>;
   registerTarget(registration: TargetRegistration): Promise<TargetState>;
   releaseLease(request: ReleaseLeaseRequest): Promise<boolean>;
   renewLease(request: RenewLeaseRequest): Promise<boolean>;

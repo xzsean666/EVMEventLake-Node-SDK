@@ -25,6 +25,8 @@ import {
   type CommitRangeResult,
   type CountLogsForRedecodeRequest,
   type GetLogsForRedecodeRequest,
+  type PruneEventsRequest,
+  type PruneEventsResult,
   type RewindResult,
   type StoredEventLog,
   type StoredEventQuery,
@@ -409,6 +411,89 @@ export class SqlStorageAdapter implements StorageAdapter {
       return Object.freeze({
         deletedLogs: Number(mutationChangedRows(deletedLogs)),
         nextBlock,
+      });
+    });
+  }
+
+  public async pruneEvents(
+    request: PruneEventsRequest,
+  ): Promise<PruneEventsResult> {
+    const { targetKey, beforeBlockNumber, maxEventsToKeep } = request;
+    if (beforeBlockNumber === undefined && maxEventsToKeep === undefined) {
+      return Object.freeze({ prunedLogs: 0 });
+    }
+
+    return this.#database.transaction().execute(async (transaction) => {
+      let totalPruned = 0;
+
+      if (beforeBlockNumber !== undefined) {
+        const beforeBlockKey = blockNumberToStorageKey(beforeBlockNumber);
+        const eventIds = transaction
+          .selectFrom("event_logs")
+          .select("event_id")
+          .where("target_key", "=", targetKey)
+          .where("block_number_key", "<", beforeBlockKey);
+
+        await transaction
+          .deleteFrom("event_parameters")
+          .where("event_id", "in", eventIds)
+          .execute();
+
+        const deletedLogs = await transaction
+          .deleteFrom("event_logs")
+          .where("target_key", "=", targetKey)
+          .where("block_number_key", "<", beforeBlockKey)
+          .executeTakeFirst();
+
+        totalPruned += Number(mutationChangedRows(deletedLogs));
+      }
+
+      if (maxEventsToKeep !== undefined && maxEventsToKeep >= 0) {
+        const countResult = await transaction
+          .selectFrom("event_logs")
+          .select((eb) => eb.fn.count("event_id").as("count"))
+          .where("target_key", "=", targetKey)
+          .executeTakeFirst();
+
+        const currentCount = Number(countResult?.count ?? 0);
+        if (currentCount > maxEventsToKeep) {
+          const excess = currentCount - maxEventsToKeep;
+          const oldestEvents = await transaction
+            .selectFrom("event_logs")
+            .select("event_id")
+            .where("target_key", "=", targetKey)
+            .orderBy("block_number_key", "asc")
+            .orderBy("transaction_index", "asc")
+            .orderBy("log_index", "asc")
+            .limit(excess)
+            .execute();
+
+          if (oldestEvents.length > 0) {
+            const eventIdsToDelete = oldestEvents.map((r) => r.event_id);
+            for (
+              let i = 0;
+              i < eventIdsToDelete.length;
+              i += BULK_IN_CHUNK_SIZE
+            ) {
+              const chunk = eventIdsToDelete.slice(i, i + BULK_IN_CHUNK_SIZE);
+              await transaction
+                .deleteFrom("event_parameters")
+                .where("event_id", "in", chunk)
+                .execute();
+
+              const deletedLogs = await transaction
+                .deleteFrom("event_logs")
+                .where("event_id", "in", chunk)
+                .executeTakeFirst();
+
+              totalPruned += Number(mutationChangedRows(deletedLogs));
+            }
+          }
+        }
+      }
+
+      return Object.freeze({
+        prunedLogs: totalPruned,
       });
     });
   }

@@ -23,6 +23,8 @@ import {
   type CommitRangeResult,
   type CountLogsForRedecodeRequest,
   type GetLogsForRedecodeRequest,
+  type PruneEventsRequest,
+  type PruneEventsResult,
   type RewindResult,
   type StoredEventLog,
   type StoredEventQuery,
@@ -530,6 +532,113 @@ export class IndexeddbStorageAdapter implements StorageAdapter {
         return Object.freeze({
           deletedLogs,
           nextBlock,
+        });
+      },
+    );
+  }
+
+  public async pruneEvents(
+    request: PruneEventsRequest,
+  ): Promise<PruneEventsResult> {
+    const { targetKey, beforeBlockNumber, maxEventsToKeep } = request;
+    if (beforeBlockNumber === undefined && maxEventsToKeep === undefined) {
+      return Object.freeze({ prunedLogs: 0 });
+    }
+
+    const db = this.#getDatabase();
+    return runTransaction(
+      db,
+      [STORES.eventLogs, STORES.eventParameters],
+      "readwrite",
+      async (tx) => {
+        const logsStore = tx.objectStore(STORES.eventLogs);
+        const paramsStore = tx.objectStore(STORES.eventParameters);
+        let totalPruned = 0;
+
+        if (beforeBlockNumber !== undefined) {
+          const beforeBlockKey = blockNumberToStorageKey(beforeBlockNumber);
+          const minBlockKey = "0".repeat(78);
+
+          const paramsRange = IDBKeyRange.bound(
+            [targetKey, minBlockKey, 0, 0],
+            [targetKey, beforeBlockKey, 0, 0],
+            false,
+            true,
+          );
+          await promisifyRequest(paramsStore.delete(paramsRange));
+
+          const logsRange = IDBKeyRange.bound(
+            [targetKey, minBlockKey, 0],
+            [targetKey, beforeBlockKey, 0],
+            false,
+            true,
+          );
+          totalPruned += await countAndDeleteRange(logsStore, logsRange);
+        }
+
+        if (maxEventsToKeep !== undefined && maxEventsToKeep >= 0) {
+          const allTargetLogsRange = IDBKeyRange.bound(
+            [targetKey, "0".repeat(78), 0],
+            [targetKey, "9".repeat(78), Number.MAX_SAFE_INTEGER],
+          );
+          const currentCount = Number(
+            await promisifyRequest(logsStore.count(allTargetLogsRange)),
+          );
+
+          if (currentCount > maxEventsToKeep) {
+            const excess = currentCount - maxEventsToKeep;
+            const cursorRequest = logsStore.openCursor(
+              allTargetLogsRange,
+              "next",
+            );
+            let deletedCount = 0;
+
+            await new Promise<void>((resolve, reject) => {
+              cursorRequest.onerror = () => {
+                reject(
+                  cursorRequest.error
+                    ? new Error(cursorRequest.error.message, {
+                        cause: cursorRequest.error,
+                      })
+                    : new Error("Cursor request failed during prune"),
+                );
+              };
+
+              cursorRequest.onsuccess = () => {
+                const cursor = cursorRequest.result;
+                if (!cursor || deletedCount >= excess) {
+                  resolve();
+                  return;
+                }
+
+                const row = cursor.value as EventLogStoreRow;
+                cursor.delete();
+                const paramRange = IDBKeyRange.bound(
+                  [targetKey, row.blockNumberKey, row.logIndex, 0],
+                  [
+                    targetKey,
+                    row.blockNumberKey,
+                    row.logIndex,
+                    Number.MAX_SAFE_INTEGER,
+                  ],
+                );
+                paramsStore.delete(paramRange);
+                deletedCount++;
+
+                if (deletedCount < excess) {
+                  cursor.continue();
+                } else {
+                  resolve();
+                }
+              };
+            });
+
+            totalPruned += deletedCount;
+          }
+        }
+
+        return Object.freeze({
+          prunedLogs: totalPruned,
         });
       },
     );

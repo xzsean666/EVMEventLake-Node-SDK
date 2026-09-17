@@ -70,6 +70,13 @@ export interface ObservabilityOptions {
   readonly onProgress?: UpdateProgressCallback;
 }
 
+export interface DataRetentionOptions {
+  readonly enabled?: boolean;
+  readonly maxBlocks?: BlockNumberInput;
+  readonly maxEvents?: number;
+  readonly pruneOnUpdate?: boolean;
+}
+
 export interface EVMEventLakeOptions {
   readonly abi: Abi;
   readonly chainId: number;
@@ -77,6 +84,7 @@ export interface EVMEventLakeOptions {
   readonly database: string;
   readonly enrichEvent?: EventEnricher;
   readonly observability?: ObservabilityOptions;
+  readonly retention?: DataRetentionOptions | undefined;
   readonly rpc?: RpcPolicyOptions;
   readonly rpcUrls: readonly string[];
   readonly startBlock: BlockNumberInput;
@@ -131,6 +139,7 @@ export interface NormalizedEVMEventLakeOptions {
   readonly database: DatabaseConfiguration;
   readonly enrichEvent?: EventEnricher;
   readonly observability: Readonly<ObservabilityOptions>;
+  readonly retention: DataRetentionOptions;
   readonly rpc: NormalizedRpcPolicy;
   readonly rpcUrls: readonly string[];
   readonly startBlock: bigint;

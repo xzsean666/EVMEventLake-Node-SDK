@@ -2,6 +2,7 @@ export { EVMEventLake } from "./client/evm-event-lake.js";
 export type { SyncCheckpoint, SyncStatus } from "./client/sync-status.js";
 export type {
   BlockNumberInput,
+  DataRetentionOptions,
   EVMEventLakeOptions,
   EventEnricher,
   EventEnrichmentContext,
@@ -21,6 +22,10 @@ export {
   normalizeTopicsFilter,
 } from "./configuration/validate-sdk-options.js";
 export * from "./errors/evm-event-lake-errors.js";
+export type {
+  PruneEventsRequest,
+  PruneEventsResult,
+} from "./storage/storage-models.js";
 export type {
   SdkLogEvent,
   SdkLogger,

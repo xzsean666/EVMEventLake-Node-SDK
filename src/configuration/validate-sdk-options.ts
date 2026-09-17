@@ -19,6 +19,7 @@ import {
 import {
   DEFAULT_RPC_POLICY,
   DEFAULT_SYNCHRONIZATION_POLICY,
+  type DataRetentionOptions,
   type DatabaseConfiguration,
   type EVMEventLakeOptions,
   type LogTopicsFilter,
@@ -663,6 +664,59 @@ export function matchesTopicFilter(
   return true;
 }
 
+export function normalizeDataRetention(
+  retention?: DataRetentionOptions,
+): DataRetentionOptions {
+  if (retention === undefined || retention === null) {
+    return Object.freeze({ enabled: false });
+  }
+  if (typeof retention !== "object") {
+    throw new ConfigurationValidationError("retention must be an object");
+  }
+
+  const enabled = retention.enabled === true;
+  if (!enabled) {
+    return Object.freeze({ enabled: false });
+  }
+
+  let maxBlocks: bigint | undefined;
+  if (retention.maxBlocks !== undefined) {
+    maxBlocks = normalizeBlockNumber(
+      retention.maxBlocks,
+      "retention.maxBlocks",
+    );
+    if (maxBlocks === 0n) {
+      throw new ConfigurationValidationError(
+        "retention.maxBlocks must be positive",
+        {
+          context: {
+            field: "retention.maxBlocks",
+            value: maxBlocks.toString(),
+          },
+        },
+      );
+    }
+  }
+
+  let maxEvents: number | undefined;
+  if (retention.maxEvents !== undefined) {
+    maxEvents = normalizePositiveInteger(
+      retention.maxEvents,
+      0,
+      "retention.maxEvents",
+    );
+  }
+
+  const pruneOnUpdate = retention.pruneOnUpdate ?? true;
+
+  return Object.freeze({
+    enabled: true,
+    ...(maxBlocks !== undefined ? { maxBlocks } : {}),
+    ...(maxEvents !== undefined ? { maxEvents } : {}),
+    pruneOnUpdate,
+  });
+}
+
 export function validateSdkOptions(
   options: EVMEventLakeOptions,
 ): NormalizedEVMEventLakeOptions {
@@ -705,6 +759,7 @@ export function validateSdkOptions(
       ? {}
       : { enrichEvent: options.enrichEvent }),
     observability: Object.freeze({ ...(options.observability ?? {}) }),
+    retention: normalizeDataRetention(options.retention),
     rpc: normalizeRpcPolicy(options.rpc),
     rpcUrls: normalizeRpcUrls(options.rpcUrls),
     startBlock: normalizeBlockNumber(options.startBlock, "startBlock"),

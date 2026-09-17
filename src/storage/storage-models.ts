@@ -134,6 +134,16 @@ export interface UpdateDecodedLogsResult {
   readonly updatedLogs: number;
 }
 
+export interface PruneEventsRequest {
+  readonly beforeBlockNumber?: bigint;
+  readonly maxEventsToKeep?: number;
+  readonly targetKey: string;
+}
+
+export interface PruneEventsResult {
+  readonly prunedLogs: number;
+}
+
 export function createStoredEventId(input: {
   readonly blockHash: Hex;
   readonly logIndex: number;
