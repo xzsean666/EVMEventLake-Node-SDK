@@ -14,7 +14,7 @@
     "@evm-event-lake/node-sdk": "github:xzsean666/EVMEventLake-Node-SDK#v0.1.0"
   },
   "devDependencies": {
-    "@types/node": "24.13.3",
+    "@types/node": "26.6.5",
     "typescript": "5.9.3"
   },
   "pnpm": {
