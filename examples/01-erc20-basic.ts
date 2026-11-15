@@ -38,10 +38,14 @@ const erc20Abi = [
   },
 ] as const;
 
-// Base 主网 USDC 合约与公共 RPC 配置
+// Base 主网 USDC 合约与多节点 RPC 容灾配置
 const BASE_CHAIN_ID = 8_453;
 const BASE_USDC_ADDRESS = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
-const BASE_RPC_URL = "https://mainnet.base.org";
+const BASE_RPC_URLS = [
+  "https://mainnet.base.org",
+  "https://base-rpc.publicnode.com",
+  "https://base.drpc.org",
+];
 const SAMPLE_BLOCK = 48_625_053n;
 
 async function main(): Promise<void> {
@@ -52,7 +56,7 @@ async function main(): Promise<void> {
   console.log("=== 1. 初始化 EVMEventLake 实例 ===");
   const eventLake = await EVMEventLake.create({
     database: `sqlite://${dbPath}`,
-    rpcUrls: [BASE_RPC_URL],
+    rpcUrls: BASE_RPC_URLS,
     chainId: BASE_CHAIN_ID,
     contractAddress: BASE_USDC_ADDRESS,
     abi: erc20Abi,

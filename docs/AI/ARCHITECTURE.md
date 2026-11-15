@@ -430,7 +430,7 @@ Output:
 Dependencies:
 - `kysely` query builder (for SQL storage).
 - Browser `indexedDB` native API (for browser IndexedDB adapter).
-- SQLite driver (`better-sqlite3`) in SQLite adapter only (dynamically loaded).
+- Built-in `node:sqlite` (`DatabaseSync`) in SQLite adapter only (zero C++ compilation).
 - PostgreSQL driver (`pg`) in PostgreSQL adapter only (dynamically loaded).
 
 No adapter-specific type may escape the storage boundary. IndexedDB, SQLite, and PostgreSQL adapters must all pass the same storage contract test suite. Shared SQL behavior is composed through `sql-storage-adapter`; SQLite and PostgreSQL entry modules own driver construction and dialect-specific runtime settings. The IndexedDB adapter operates directly over native browser ObjectStores with atomic transaction guarantees.

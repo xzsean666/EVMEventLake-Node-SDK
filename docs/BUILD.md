@@ -27,7 +27,7 @@ explicit public license remain release decisions.
 | pnpm | 10.12.1 | Development and consumer examples |
 | viem | 2.55.2 | HTTP EVM RPC and ABI primitives |
 | Kysely | 0.29.3 | Typed SQL construction and dialect boundary |
-| better-sqlite3 | 12.11.1 | SQLite adapter (Node.js) |
+| node:sqlite | Built-in (Node.js >=22.5) | Zero-compilation SQLite adapter |
 | pg | 8.22.0 | PostgreSQL adapter (Node.js) |
 | fake-indexeddb | 6.2.5 | In-memory IndexedDB runtime for testing |
 | Vitest | 4.1.10 | Unit, integration, and storage parity tests |
@@ -115,8 +115,8 @@ pnpm install --frozen-lockfile
 The repository must commit `pnpm-lock.yaml` and pin the package manager version
 through the package manifest.
 
-`pnpm-workspace.yaml` explicitly allows the `better-sqlite3` native install
-script. No other dependency build script is allowlisted by default.
+Zero native C++ build scripts or compiler toolchains are required; SQLite is backed
+by Node's built-in `node:sqlite` (`DatabaseSync`).
 
 Quality commands:
 
@@ -520,7 +520,7 @@ Node.js `24.2.0` and the supported minimum Node.js `22.23.1`:
   `UpdateResult` from the package root.
 - Runtime imports exposed the public client and errors without internal RPC,
   storage, ABI, or synchronization classes.
-- `better-sqlite3` installed successfully for each Node runtime and a consumer
+- Node built-in `node:sqlite` operated seamlessly without C++ compilation and a consumer
   synchronized, queried, paginated, read offline, and closed a SQLite-backed
   client.
 - The consumer lockfile recorded the expected Git commit rather than an npm

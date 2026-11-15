@@ -25,7 +25,11 @@ const erc20Abi = [
 
 const BASE_CHAIN_ID = 8_453;
 const BASE_USDC_ADDRESS = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
-const BASE_RPC_URL = "https://mainnet.base.org";
+const BASE_RPC_URLS = [
+  "https://mainnet.base.org",
+  "https://base-rpc.publicnode.com",
+  "https://base.drpc.org",
+];
 const SAMPLE_BLOCK = 48_625_050n;
 
 let lake: EVMEventLake | null = null;
@@ -71,7 +75,7 @@ async function handleInit(): Promise<void> {
           log(`Progress stage: ${event.stage}`);
         },
       },
-      rpcUrls: [BASE_RPC_URL],
+      rpcUrls: BASE_RPC_URLS,
       startBlock: SAMPLE_BLOCK,
     });
 

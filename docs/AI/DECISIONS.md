@@ -229,4 +229,16 @@ Do not overturn or casually change these decisions. Any modification requires an
   - Grants EVMEventLake instant access to advanced `evm-call` capabilities: intelligent layered caching, interpolation search, adaptive 10,000+ result chunking, and Multicall3 reorg assertions.
   - Clean separation of concerns: `evm-call` handles blockchain RPC resilience; `EVMEventLake` handles data persistence, indexing, and querying.
 
+---
+
+## DEC-024: Migrate SQLite Adapter from better-sqlite3 to Node.js Built-in node:sqlite (Zero-Compilation Runtime)
+
+- **Context**: `better-sqlite3` is a native C++ compiled Node addon. In modern Node.js environments (Node.js 22.5+, Node 24, Node 26), native compilation requires Python, C++ compiler toolchains (`node-gyp`), and package manager build allowlists (`onlyBuiltDependencies`). Furthermore, Node.js now provides built-in, stable SQLite support via `node:sqlite` (`DatabaseSync`).
+- **Decision**: Remove `better-sqlite3` and `@types/better-sqlite3`. Implement a custom Kysely `NodeSqliteDialect` backed by Node's built-in `node:sqlite` module (`DatabaseSync`).
+- **Consequences**:
+  - Zero native C++ compilation required during `pnpm install` or Git dependency installation across all OS platforms (Linux, macOS, Windows).
+  - Removes the requirement for `onlyBuiltDependencies` in `package.json` and `pnpm-workspace.yaml`.
+  - 100% behavioral and contract test parity maintained with standard SQLite PRAGMAs (`WAL`, `foreign_keys`, `busy_timeout`), atomic transactions, and savepoints.
+
+
 

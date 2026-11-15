@@ -404,6 +404,57 @@ describe("Event Enrichment (TASK-013)", () => {
       await idbStorage.close();
     }
   });
+
+  it("wraps redecode enrichment failure in typed EventEnrichmentError", async () => {
+    rpc.logs.set(100n, [
+      {
+        address: contractAddress,
+        blockHash: hex32(100),
+        blockNumber: 100n,
+        data: "0x000000000000000000000000000000000000000000000000000000000000002a",
+        logIndex: 0,
+        removed: false,
+        topics: [
+          encodeEventTopics({
+            abi,
+            eventName: "ValueChanged",
+          })[0],
+          "0x0000000000000000000000000000000000000000000000000000000000000001",
+        ],
+        transactionHash: hex32(1),
+        transactionIndex: 0,
+      },
+    ]);
+
+    const updateService = new UpdateService({
+      catalog,
+      rpc,
+      rpcPolicy: DEFAULT_RPC_POLICY,
+      storage,
+      synchronizationPolicy: {
+        ...DEFAULT_SYNCHRONIZATION_POLICY,
+        confirmations: 0,
+      },
+      target,
+    });
+
+    await updateService.update({ toBlock: 100n });
+
+    const redecodeService = new RedecodeService({
+      storage,
+      target,
+    });
+
+    await expect(
+      redecodeService.redecode(catalog, {
+        abi,
+        enrichEvent: () => {
+          throw new Error("Simulated enrichment crash during redecode");
+        },
+        redecodeAll: true,
+      }),
+    ).rejects.toThrow(EventEnrichmentError);
+  });
 });
 
 function hex32(byte: number): Hex {

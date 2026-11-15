@@ -131,17 +131,14 @@ Runtime versions are pinned in `package.json` and `pnpm-lock.yaml`.
 Kysely must not become the public storage contract. Adapter behavior is defined
 by this repository and tested against both databases.
 
-### better-sqlite3
+### node:sqlite (Node.js Built-in SQLite)
 
-- Selected version: `12.11.1`.
-
-- Repository: <https://github.com/WiseLibs/better-sqlite3>
-- API docs: <https://github.com/WiseLibs/better-sqlite3/blob/master/docs/api.md>
-- Relationship: Runtime dependency for SQLite installations.
+- Selected version: Built-in to Node.js `>=22.5.0` (`node:sqlite`).
+- Official documentation: <https://nodejs.org/api/sqlite.html>
+- Relationship: Node runtime built-in module for embedded SQLite storage.
 - SDK area: `storage/sqlite` only.
-- Why used: Mature embedded SQLite driver supported by Kysely's SQLite
-  dialect.
-- Verified: 2026-07-14.
+- Why used: Native, zero-compilation SQLite driver built directly into Node.js runtime, eliminating node-gyp build steps, Python dependencies, and `onlyBuiltDependencies` requirements.
+- Verified: 2026-11-15.
 
 ### node-postgres (`pg`)
 

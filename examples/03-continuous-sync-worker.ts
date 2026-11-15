@@ -40,7 +40,11 @@ const erc20Abi = [
 
 const BASE_CHAIN_ID = 8_453;
 const BASE_USDC_ADDRESS = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
-const BASE_RPC_URL = "https://mainnet.base.org";
+const BASE_RPC_URLS = [
+  "https://mainnet.base.org",
+  "https://base-rpc.publicnode.com",
+  "https://base.drpc.org",
+];
 const SAMPLE_BLOCK = 48_625_053n;
 
 // 轮询间隔（毫秒）
@@ -67,7 +71,7 @@ async function runWorker(): Promise<void> {
   console.log("=== 初始化同步 Worker ===");
   const eventLake = await EVMEventLake.create({
     database: `sqlite://${dbPath}`,
-    rpcUrls: [BASE_RPC_URL],
+    rpcUrls: BASE_RPC_URLS,
     chainId: BASE_CHAIN_ID,
     contractAddress: BASE_USDC_ADDRESS,
     abi: erc20Abi,

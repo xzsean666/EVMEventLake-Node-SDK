@@ -250,9 +250,8 @@ Required URL forms:
 
 SQLite initialization may create the database file when pointing to a persistent path. The parent directory must
 already exist (except for `:memory:` in-memory mode). Database URLs containing credentials must be redacted in logs and
-errors. In browser dApps and bundling environments, `idb://` requires zero Node.js
-C++ native bindings (`better-sqlite3`, `pg`), loading storage drivers via dynamic
-asynchronous imports.
+errors. SQLite uses Node.js built-in `node:sqlite` (`DatabaseSync`), requiring zero C++ compilation. In browser dApps and bundling environments, `idb://` requires zero Node.js
+native bindings, loading storage drivers via dynamic asynchronous imports.
 
 ### 7.3 Optional synchronization policy
 

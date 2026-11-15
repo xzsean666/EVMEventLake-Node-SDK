@@ -30,7 +30,11 @@ const erc20Abi = [
 
 const BASE_CHAIN_ID = 8_453;
 const BASE_USDC_ADDRESS = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
-const BASE_RPC_URL = "https://mainnet.base.org";
+const BASE_RPC_URLS = [
+  "https://mainnet.base.org",
+  "https://base-rpc.publicnode.com",
+  "https://base.drpc.org",
+];
 const SAMPLE_BLOCK = 48_625_053n;
 
 // 从环境变量读取 PostgreSQL 连接串，若未提供则展示配置说明
@@ -81,7 +85,7 @@ async function main(): Promise<void> {
   // 1. 初始化客户端（连接 PostgreSQL）
   const eventLake = await EVMEventLake.create({
     database: databaseUrl,
-    rpcUrls: [BASE_RPC_URL],
+    rpcUrls: BASE_RPC_URLS,
     chainId: BASE_CHAIN_ID,
     contractAddress: BASE_USDC_ADDRESS,
     abi: erc20Abi,

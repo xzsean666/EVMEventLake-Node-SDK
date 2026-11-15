@@ -5,7 +5,7 @@ An embedded TypeScript SDK that incrementally copies ABI-defined events from one
 - **One-shot synchronization**: Every `update()` call performs one deterministic sync up to the confirmed head or `toBlock`. No hidden background threads or uncontrollable polling loops.
 - **Resilient RPC transport**: Multi-endpoint failover, chain ID validation, automatic retries, and adaptive `eth_getLogs` range splitting when providers reject large queries.
 - **Zero RPC queries**: All event reads (`findMany`, `findFirst`) and status checks (`getSyncStatus`) query the local database directly—fast, offline-friendly, with zero RPC rate-limit consumption.
-- **Production-ready storage**: Supports embedded SQLite (`sqlite://...`) and shared PostgreSQL (`postgresql://...`) with target-scoped distributed leases to prevent concurrent write collisions.
+- **Production-ready storage**: Supports embedded SQLite (`sqlite://...` via Node built-in `node:sqlite` with zero C++ compilation), shared PostgreSQL (`postgresql://...`), and browser IndexedDB (`idb://...`) with target-scoped distributed leases to prevent concurrent write collisions.
 
 ---
 
@@ -345,7 +345,7 @@ const tracker = new EvmCall.CooldownTracker();
 
 ## Storage Options
 
-- **SQLite**: `sqlite://events.db` or `sqlite:///var/data/events.db` (single-process / embedded Node.js).
+- **SQLite**: `sqlite://events.db` or `sqlite:///var/data/events.db` (single-process / embedded Node.js, backed by native `node:sqlite` without C++ build steps).
 - **PostgreSQL**: `postgresql://user:password@host:5432/database` (multi-process / shared database with distributed lease).
 - **IndexedDB**: `idb://my-lake` or `indexeddb://my-lake` (browser dApps, frontend SPAs, offline client cache).
 

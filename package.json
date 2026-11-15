@@ -34,11 +34,6 @@
     "node": ">=22"
   },
   "packageManager": "pnpm@10.12.1",
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "better-sqlite3"
-    ]
-  },
   "scripts": {
     "clean": "node scripts/clean-dist.mjs",
     "prebuild": "pnpm run clean",
@@ -70,15 +65,13 @@
     "verify": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build"
   },
   "dependencies": {
-    "better-sqlite3": "12.11.1",
-    "evm-call": "github:xzsean666/evm-call#d7a5c16d2bcbda6255d05f1f5b745eac88f699c0",
+    "evm-call": "github:xzsean666/evm-call#2d9a61bb47d4625b5f404d2ce14fffa78d066d80",
     "kysely": "0.29.3",
     "pg": "8.22.0",
     "viem": "2.55.2"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",
-    "@types/better-sqlite3": "7.6.13",
     "@types/node": "26.6.5",
     "@types/pg": "8.20.0",
     "eslint": "9.39.5",

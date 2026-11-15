@@ -148,7 +148,7 @@ export class EVMEventLake {
     this.#assertOpen();
     if (this.#activeOperation !== null) {
       throw new SynchronizationLockedError(
-        "This SDK instance already has an active update or redecode operation",
+        "This SDK instance already has an active update, redecode, or prune operation",
         { context: { targetKey: this.#targetKey } },
       );
     }
@@ -183,7 +183,21 @@ export class EVMEventLake {
     options?: DataRetentionOptions,
   ): Promise<PruneEventsResult> {
     this.#assertOpen();
-    return this.#executePrune(options ?? this.#retention);
+    if (this.#activeOperation !== null) {
+      throw new SynchronizationLockedError(
+        "This SDK instance already has an active update, redecode, or prune operation",
+        { context: { targetKey: this.#targetKey } },
+      );
+    }
+    const prunePromise = this.#executePrune(options ?? this.#retention);
+    this.#activeOperation = prunePromise;
+    try {
+      return await prunePromise;
+    } finally {
+      if (this.#activeOperation === prunePromise) {
+        this.#activeOperation = null;
+      }
+    }
   }
 
   async #executePrune(
@@ -222,7 +236,7 @@ export class EVMEventLake {
     this.#assertOpen();
     if (this.#activeOperation !== null) {
       throw new SynchronizationLockedError(
-        "This SDK instance already has an active update or redecode operation",
+        "This SDK instance already has an active update, redecode, or prune operation",
         { context: { targetKey: this.#targetKey } },
       );
     }

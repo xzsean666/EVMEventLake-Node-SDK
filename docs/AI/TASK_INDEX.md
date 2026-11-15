@@ -40,13 +40,15 @@ TODO -> IN_PROGRESS -> REVIEW -> DONE
 | **`TASK-012`** | Subpath and Namespace Re-Export for evm-call Foundation SDK | **DONE** | `TASK-011` | Expose `@evm-event-lake/node-sdk/evm-call` and `EvmCall` namespace so downstream projects can use foundation utilities without duplicate dependency declarations. | [`TASK-012.md`](tasks/TASK-012.md) |
 | **`TASK-013`** | Custom Event Enrichment Hook with Durable Additional Data (`additionalData`) | **DONE** | `TASK-000` | Custom sync/async event enricher hook (`enrichEvent`), storing custom JSON in `additional_data` database column with 100% parity across SQLite, PostgreSQL, and IndexedDB, returned on `EventRecord.additionalData`. | [`TASK-013.md`](tasks/TASK-013.md) |
 | **`TASK-014`** | Native getLogs Topic Filters Support (`topic0`..`topic3`) | **DONE** | `TASK-000` | Support native EVM `eth_getLogs` topic filters (`topic0`, `topic1`, `topic2`, `topic3`) across SDK options, update calls, RPC layer, and sync pipeline. | [`TASK-014.md`](tasks/TASK-014.md) |
+| **`TASK-015`** | Upgrade evm-call to Latest & Migrate SQLite to Node Native node:sqlite | **DONE** | `TASK-014` | Upgrade `evm-call` dependency to latest Git hash, remove `better-sqlite3`, and migrate SQLite adapter to Node.js built-in `node:sqlite` for zero-compilation runtime. | [`TASK-015.md`](tasks/TASK-015.md) |
+| **`TASK-016`** | Comprehensive Post-Audit Hardening, Concurrency Protection, and Error Classification Parity | **DONE** | `TASK-015` | Address all findings from comprehensive audit: async executeQuery, Date/ArrayBuffer input conversions, redecode EventEnrichmentError parity, lake.prune concurrency locks, and multi-endpoint RPC fallbacks in examples. | [`TASK-016.md`](tasks/TASK-016.md) |
 
 ---
 
 ## 3. Execution Priority & Next Up
 
-1. **Current Active Task**: None (All tasks TASK-000 through TASK-014 are `DONE`).
-2. **Next Up**: Final verification and prepare Git release tag `v0.1.0`.
+1. **Current Active Task**: None (All tasks TASK-000 through TASK-016 are `DONE`).
+2. **Next Up**: Full verification and prepare Git release tag `v0.1.0`.
 
 ---
 

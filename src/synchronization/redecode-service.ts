@@ -9,7 +9,10 @@ import type {
 } from "../configuration/sdk-options.js";
 import { normalizeBlockNumber } from "../configuration/validate-sdk-options.js";
 import type { ContractTarget } from "../contract-target/contract-target.js";
-import { ConfigurationValidationError } from "../errors/evm-event-lake-errors.js";
+import {
+  ConfigurationValidationError,
+  EventEnrichmentError,
+} from "../errors/evm-event-lake-errors.js";
 import type { SdkLogger } from "../observability/sdk-logger.js";
 import { emitLogSafely } from "../observability/sdk-logger.js";
 import type { StorageAdapter } from "../storage/storage-adapter.js";
@@ -216,7 +219,27 @@ export class RedecodeService {
             transactionHash: log.transactionHash,
             transactionIndex: log.transactionIndex,
           });
-          const enrichResult = await options.enrichEvent(enrichmentContext);
+          let enrichResult: unknown;
+          try {
+            enrichResult = await options.enrichEvent(enrichmentContext);
+          } catch (cause) {
+            throw new EventEnrichmentError(
+              `Enrichment function failed during redecode for event ${log.eventId}`,
+              {
+                cause,
+                context: {
+                  blockNumber: log.blockNumber.toString(),
+                  eventId: log.eventId,
+                  eventName:
+                    decodeResult.status === "decoded"
+                      ? decodeResult.eventName
+                      : null,
+                  targetKey: this.#target.targetKey,
+                  transactionHash: log.transactionHash,
+                },
+              },
+            );
+          }
           additionalData =
             enrichResult !== undefined && enrichResult !== null
               ? encodeDecodedValue(enrichResult)

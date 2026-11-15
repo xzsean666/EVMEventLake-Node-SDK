@@ -9,6 +9,7 @@ import { encodeEventTopics, parseAbi } from "viem";
 import {
   ConfigurationValidationError,
   EVMEventLake,
+  SynchronizationLockedError,
   normalizeDataRetention,
 } from "../support/internal-exports.js";
 
@@ -259,6 +260,31 @@ describe("Data Retention & Pruning", () => {
       } finally {
         await lake.close();
         await new Promise<void>((resolve) => server.close(() => resolve()));
+      }
+    });
+
+    it("locks active operation during on-demand prune and graceful close awaits it", async () => {
+      const lake = await EVMEventLake.create({
+        abi: TEST_ABI,
+        chainId: 1,
+        contractAddress: "0x1111111111111111111111111111111111111111",
+        database: "sqlite://:memory:",
+        rpcUrls: ["http://127.0.0.1:8545"],
+        startBlock: 100n,
+      });
+
+      try {
+        // Start an asynchronous prune
+        const prunePromise = lake.prune({ maxBlocks: 10n });
+
+        // Concurrent prune or update or redecode must throw SynchronizationLockedError
+        await expect(lake.prune({ maxBlocks: 10n })).rejects.toThrow(
+          SynchronizationLockedError,
+        );
+
+        await prunePromise;
+      } finally {
+        await lake.close();
       }
     });
   });

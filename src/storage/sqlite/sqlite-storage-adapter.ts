@@ -1,12 +1,13 @@
 import { existsSync } from "node:fs";
 import { dirname } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 
-import Database from "better-sqlite3";
-import { Kysely, SqliteDialect } from "kysely";
+import { Kysely } from "kysely";
 
 import { StorageInitializationError } from "../../errors/evm-event-lake-errors.js";
 import { SqlStorageAdapter } from "../sql-storage-adapter.js";
 import type { StorageDatabaseSchema } from "../storage-database-schema.js";
+import { NodeSqliteDialect } from "./node-sqlite-dialect.js";
 
 export function createSqliteStorageAdapter(
   filename: string,
@@ -21,12 +22,12 @@ export function createSqliteStorageAdapter(
     }
   }
 
-  let sqliteDatabase: Database.Database;
+  let sqliteDatabase: DatabaseSync;
   try {
-    sqliteDatabase = new Database(filename);
-    sqliteDatabase.pragma("foreign_keys = ON");
-    sqliteDatabase.pragma("journal_mode = WAL");
-    sqliteDatabase.pragma("busy_timeout = 5000");
+    sqliteDatabase = new DatabaseSync(filename);
+    sqliteDatabase.exec("PRAGMA foreign_keys = ON;");
+    sqliteDatabase.exec("PRAGMA journal_mode = WAL;");
+    sqliteDatabase.exec("PRAGMA busy_timeout = 5000;");
   } catch (cause) {
     throw new StorageInitializationError("Unable to open SQLite database", {
       cause,
@@ -35,7 +36,7 @@ export function createSqliteStorageAdapter(
   }
 
   const database = new Kysely<StorageDatabaseSchema>({
-    dialect: new SqliteDialect({ database: sqliteDatabase }),
+    dialect: new NodeSqliteDialect(sqliteDatabase),
   });
   return new SqlStorageAdapter(database, async () => {
     await database.destroy();
